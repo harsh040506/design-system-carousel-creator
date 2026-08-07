@@ -18,7 +18,7 @@ pip install playwright && playwright install chromium
 
 One command, whole pipeline, ends with the library open in your browser.
 
-📖 **[Full documentation](docs/)** — getting started, concepts, every command, the canvas,
+📖 **[Full documentation](design-system-carousel-creator/docs/)** — getting started, concepts, every command, the canvas,
 defect reference, troubleshooting.
 
 ---
@@ -195,7 +195,7 @@ The gate requires ≥ 2.6. "Fifty unique layouts" stops being an aspiration.
 | **Veracity** | 10 | deterministic | text with no provenance, numbers absent from the brief |
 | **Craft** | 20 | judged | weak hierarchy, web chrome, thumbnail illegibility, copy that reads like a report |
 
-Full anchors live in [`schema/rubric.json`](schema/rubric.json). The critic must cite a card
+Full anchors live in [`schema/rubric.json`](design-system-carousel-creator/schema/rubric.json). The critic must cite a card
 index and a visible reason for every deduction; unanchored deductions are discarded on merge.
 
 **If Craft is unscored the total is out of 80, and the scorecard says so in its own defect list.**
@@ -260,4 +260,4 @@ other, which is the main reason the split exists.
 ## Licence
 
 MIT. The bundled JetBrains Mono subset is SIL OFL 1.1 — see
-[`assets/canvas/FONT-LICENSE.md`](assets/canvas/FONT-LICENSE.md).
+[`assets/canvas/FONT-LICENSE.md`](design-system-carousel-creator/assets/canvas/FONT-LICENSE.md).
