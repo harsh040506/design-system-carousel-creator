@@ -1,0 +1,159 @@
+{
+  "$comment": [
+    "Zero-prompt defaults. When the user supplies a design system and content but",
+    "no instructions -- no card count, no format, no tone, no taxonomy -- these are",
+    "the decisions taken WITHOUT asking. The point is that 'make me a library from",
+    "this' is a complete instruction: every field below has a defensible default,",
+    "so nothing blocks on a question whose answer is nearly always the same.",
+    "Anything the user DOES specify overrides the matching key."
+  ],
+  "version": "1.0.0",
+
+  "project": {
+    "isolate": true,
+    "create_before_anything_writes": true,
+    "layout": {
+      "inputs": "frozen copies of the design system and every source document",
+      "build": "design-system.json, content-brief.json, layout-plan.json, build.py",
+      "dist": "the deliverable bundle: .dc.html, runtime, canvas.html, slot state",
+      "audit": "scorecard, lint, measure, uniq, report.html, history.jsonl",
+      "shots": "per-card PNGs"
+    },
+    "rationale": "A run is a project, not a directory. Writing every artifact into the current working directory means a second library built in the same folder silently overwrites the first, with no warning at any point. Create the project first; every stage after reads its wiring from project.json, which is also what lets audit take zero arguments instead of five paths that can each be wrong."
+  },
+
+  "constraints": {
+    "capture_at": ":new",
+    "map": {
+      "each card must stand alone": "--independent  ->  CROSS_REFERENCE (P1)",
+      "do not mention the source": "--no-source  ->  SOURCE_LEAK (P0) + attribution patterns",
+      "never say X": "--forbid \"X\"  ->  literal, case-insensitive, cards AND chrome"
+    },
+    "rationale": "Any constraint the user states in prose becomes a field in the manifest and a code in the linter, or it is not a constraint. A rule only a careful human enforces is a rule that eventually gets skipped under deadline pressure and ships a regression nobody catches.",
+    "legal_fix_note": "CROSS_REFERENCE is resolved by RESTATING the referenced fact on the card. Deleting the referring sentence leaves the card thinner than it was: a card that points elsewhere is a card missing content, which is the density law wearing a different hat."
+  },
+
+  "preview": {
+    "end_every_run_with_it": true,
+    "command": "dscc.py preview",
+    "rationale": "A .dc.html expects a host application to supply the canvas, the zoom and the prop editor; served from a plain static server it renders and does nothing, with no error message. scaffold init installs canvas.html into the bundle and the pipeline ends by opening it — a library nobody has looked at is not finished, and some compositional defects are invisible in every deterministic number and obvious the moment you actually see the card."
+  },
+
+  "artboard": {
+    "width": 1080,
+    "height": 1440,
+    "ratio": "3:4",
+    "rationale": "3:4 is the format professional carousel libraries in this category use: taller than 4:5, so it carries more content per card while still cropping safely for Instagram portrait. Switch to 1080x1350 only when the user names Instagram specifically.",
+    "alternatives": { "instagram_portrait": [1080, 1350], "square": [1080, 1080] }
+  },
+
+  "scale": {
+    "cards": 50,
+    "rationale": "Reference libraries run 40-120 formats. 50 is enough for the taxonomy to feel complete and the narrative arc to have room, and small enough to build carefully in one pass. Go to 100+ only when asked."
+  },
+
+  "themes": {
+    "mode": "single-file-enum",
+    "rationale": "One document, one enum prop, both themes applied at runtime by applyTheme(). Never emit separate light and dark files -- they drift apart immediately and double the maintenance surface.",
+    "props": ["theme (White|Black)", "showLabels (boolean)"]
+  },
+
+  "surfaces": {
+    "required_set": ["paper", "panel", "ink", "accent-1", "grey"],
+    "optional": ["accent-2"],
+    "distribution_per_50": {
+      "paper": [20, 26], "panel": [6, 9], "ink": [6, 9],
+      "accent-1": [4, 6], "accent-2": [2, 4], "grey": [3, 5]
+    },
+    "rationale": "A named surface set is the single highest-leverage move for perceived range. Binary light/dark is the most common failure in generated libraries. Derive accent grounds from the brand's accent colour darkened to a usable ground if the source does not supply them.",
+    "rule": "Never place two cards with the same loud ground (ink, accent-1, accent-2) adjacent."
+  },
+
+  "media": {
+    "cards_with_slots": [16, 20],
+    "prefill": true,
+    "treatment": "grayscale-or-duotone",
+    "placeholder_style": "describe the intended subject, never the word 'Image'",
+    "rationale": "A library demoed with grey rectangles reads as unfinished regardless of layout quality. Prefill from openly-licensed sources; uniform grayscale makes heterogeneous stock look commissioned."
+  },
+
+  "grammar": {
+    "devices_required": 2,
+    "devices_max": 3,
+    "candidates": [
+      "ornamental/swash capital opening display words at ~1.4x cap height",
+      "bracketed micro-label convention: [ Like This ]",
+      "corner micro-labels pinned to artboard edges",
+      "a single geometric intervention repeated at varying scale (notch, cut corner, bleed)",
+      "a fixed rule weight used as the only divider",
+      "hanging index numbers in the left margin"
+    ],
+    "rationale": "Colours and fonts are not a grammar. Two or three arbitrary-but-relentlessly-consistent devices are what make a library read as authored. If the brand supplies none, invent one and apply it everywhere -- an invented device used fifty times reads as intent."
+  },
+
+  "typography": {
+    "registers_per_card": 3,
+    "display_min_px": 46,
+    "display_typical_px": [62, 104],
+    "micro_px": [13, 19],
+    "rationale": "Three registers max: display, body, micro. The micro register (corner labels, index numbers, credits, bracketed asides) is where density comes from without loudness. Display floor of 46px is set by thumbnail legibility at 3.6x reduction."
+  },
+
+  "taxonomy": {
+    "naming": "flat numbered list of specific named formats",
+    "name_is_a_spec": true,
+    "examples_of_good_names": [
+      "Comparison · capability matrix",
+      "Definition · glossary term",
+      "Timeline · rollout milestones",
+      "Location callout · map pin"
+    ],
+    "examples_of_bad_names": ["Content slide 4", "Category A variant 3", "Text layout"],
+    "rationale": "If two format names could be swapped without anyone noticing, they are one format. A good name describes mechanic, content type and rough appearance."
+  },
+
+  "structural_formats": {
+    "minimum": 6,
+    "required": ["table of contents with references", "section divider", "recap/summary index", "end card"],
+    "optional": ["agenda", "credits/colophon", "glossary"],
+    "rationale": "Connective tissue appears as often as content in a real carousel and is usually the most typographically confident work in the set, because it has the least content and composition has nowhere to hide."
+  },
+
+  "content": {
+    "claims_multiplier": 3,
+    "rationale": "Extract 3x the card count in atomic claims. The surplus is what resolves under-written cards later without inventing anything."
+  },
+
+  "voice": {
+    "headline_max_words": 9,
+    "row_max_words": 20,
+    "one_claim_per_card": true,
+    "forbidden": [
+      "web chrome of any kind (buttons, nav, pricing tiers, forms, tabs)",
+      "lorem ipsum or placeholder category names",
+      "numbers absent from the source material"
+    ]
+  },
+
+  "output": {
+    "format": "dc.html",
+    "bundle_files": ["support.js", "image-slot.js", "canvas.html", ".image-slots.state.json"],
+    "runtime_is_mandatory": true,
+    "source_of_truth": "build/build.py",
+    "rationale": "Every built library is a self-contained bundle and scripts/scaffold.py installs and verifies all of it on every build, so this is mechanical rather than remembered. The .dc.html is an OUTPUT: the generator beside it is the source. A 121 KB hand-edited HTML file with no source cannot be re-typed, re-themed or re-ordered; the same file with a 400-line builder is an asset."
+  },
+
+  "builder_invariants": [
+    "main() always re-scaffolds from scratch. Patching the document in place makes the style layer sticky — `if MARKER not in doc` is never true after the first successful build, so every later CSS edit silently does not reach the output, and the failure looks exactly like the edit not working.",
+    "Ground tokens go into :root BEFORE the CSS layer is inserted. Reversing the order and guarding the injection with `if '--tok' not in doc` matches the CSS layer's own var(--tok) uses, so the tokens are never written and the document fills with UNDECLARED_VAR P0s.",
+    "Never emit numeric HTML entities. `&#9671;` survives tag-stripping in the auditor's text extractor as the digits 9671, which the veracity check reads as an invented figure. One decorative lozenge produced fifty P0s and a failed gate. Write the literal character; the document is UTF-8.",
+    "Every colour used in card markup belongs in BOTH theme maps. A token declared once in :root cannot follow the theme, so on a two-theme document it is provably wrong in one of them (MONO_THEME_TOKEN)."
+  ],
+
+  "when_to_actually_ask": [
+    "The source documents contradict each other on a fact that would appear on a card.",
+    "The brand supplies no colour information at all and no accent can be inferred.",
+    "The user's content is clearly for a medium other than social carousels (a report, a spec sheet).",
+    "Everything else: choose from this file and state the choice in the final report."
+  ]
+}

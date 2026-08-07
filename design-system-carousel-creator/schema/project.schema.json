@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://design-system-carousel-creator/schema/project.schema.json",
+  "title": "Design System Carousel Creator project manifest",
+  "description": "The root of an isolated project. Everything a run produces lives beside this file, and every stage reads its wiring from here rather than from command-line flags — which is what stops a library being audited against the wrong brief.",
+  "type": "object",
+  "required": ["creator_version", "name", "slug", "created", "layout", "canvas"],
+  "additionalProperties": true,
+  "properties": {
+    "creator_version": {
+      "type": "string",
+      "description": "Plugin version that created the project. Migrations key off this."
+    },
+    "name": { "type": "string", "description": "Human name. Also the .dc.html basename." },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "created": { "type": "string", "description": "ISO 8601" },
+    "updated": { "type": "string" },
+    "brand": { "type": "string", "description": "Brand the design system belongs to." },
+
+    "layout": {
+      "type": "object",
+      "description": "Relative paths, so the whole project folder is movable and zippable.",
+      "required": ["inputs", "build", "dist", "audit", "shots"],
+      "properties": {
+        "inputs": { "type": "string", "default": "inputs" },
+        "build":  { "type": "string", "default": "build" },
+        "dist":   { "type": "string", "default": "dist" },
+        "audit":  { "type": "string", "default": "audit" },
+        "shots":  { "type": "string", "default": "shots" }
+      }
+    },
+
+    "canvas": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width":  { "type": "integer", "minimum": 320 },
+        "height": { "type": "integer", "minimum": 320 },
+        "ratio":  { "type": "string" },
+        "rhythm": { "type": "integer", "default": 64 },
+        "cards":  { "type": "integer", "default": 50 },
+        "columns":{ "type": "integer", "default": 5,
+                    "description": "Gallery grid columns in the .dc.html." }
+      }
+    },
+
+    "artifacts": {
+      "type": "object",
+      "description": "Where each pipeline artifact lives, relative to the project root. Written by the stage that produces it; read by every stage after.",
+      "properties": {
+        "system":   { "type": "string", "default": "build/design-system.json" },
+        "brief":    { "type": "string", "default": "build/content-brief.json" },
+        "plan":     { "type": "string", "default": "build/layout-plan.json" },
+        "builder":  { "type": "string", "default": "build/build.py" },
+        "library":  { "type": "string", "description": "e.g. dist/Brand Template Library.dc.html" },
+        "canvas":   { "type": "string", "default": "dist/canvas.html" },
+        "scorecard":{ "type": "string", "default": "audit/scorecard.json" },
+        "critic":   { "type": "string", "default": "audit/critic.json" },
+        "history":  { "type": "string", "default": "audit/history.jsonl" },
+        "release":  { "type": "string", "default": "RELEASE.md" }
+      }
+    },
+
+    "inputs": {
+      "type": "object",
+      "description": "Frozen at `dscc new`. The library is not reproducible without these, and in six months nobody remembers which brief produced which slides.",
+      "properties": {
+        "design_system": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "constraints": {
+      "type": "object",
+      "description": "Prose constraints made enforceable. Each one maps to a deterministic lint code; anything here is checked on every audit and reported in the scorecard, so a passing gate means something specific about the constraints rather than only about geometry.",
+      "properties": {
+        "independent_cards": {
+          "type": "boolean", "default": false,
+          "description": "No card may depend on having read another. Emits CROSS_REFERENCE (P1). The legal fix is to RESTATE the referenced fact on this card — a cross-reference is a card missing content, which is the density law wearing a different hat."
+        },
+        "no_source_attribution": {
+          "type": "boolean", "default": false,
+          "description": "No title, author, editor, publisher or chapter name anywhere in the artwork. Emits SOURCE_LEAK (P0): one violation is a total failure of this constraint class, not a degradation."
+        },
+        "forbidden_terms": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Case-insensitive literals. Populated automatically from source metadata at `dscc new`, then extended by hand."
+        },
+        "forbidden_patterns": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Python regexes, applied to card text and to the gallery chrome."
+        },
+        "required_terms": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Must appear at least once across the library (a legal line, a handle)."
+        }
+      }
+    },
+
+    "theme": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "string", "enum": ["Black", "White"], "default": "Black" },
+        "dark_first": { "type": "boolean", "default": true },
+        "light_is_derived": {
+          "type": "boolean", "default": false,
+          "description": "True when the brand specifies only one mode and the other is a derived courtesy variant. Reported at ship time rather than silently presented as designed."
+        }
+      }
+    },
+
+    "serve": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer", "default": 4173 },
+        "open": { "type": "boolean", "default": true },
+        "watch": { "type": "boolean", "default": false }
+      }
+    },
+
+    "state": {
+      "type": "object",
+      "description": "Pipeline progress. Each stage stamps its own key on success, so `dscc info` can say what is done and what is next without guessing from file mtimes.",
+      "properties": {
+        "distilled": { "type": ["string", "null"] },
+        "briefed":   { "type": ["string", "null"] },
+        "planned":   { "type": ["string", "null"] },
+        "built":     { "type": ["string", "null"] },
+        "audited":   { "type": ["string", "null"] },
+        "shipped":   { "type": ["string", "null"] },
+        "passes":    { "type": "integer", "default": 0 },
+        "best_total":{ "type": ["number", "null"] }
+      }
+    },
+
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

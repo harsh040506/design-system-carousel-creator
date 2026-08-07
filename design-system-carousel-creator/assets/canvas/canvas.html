@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__DOC_TITLE__ — canvas</title>
+<!--
+  DESIGN SYSTEM CAROUSEL CREATOR — CANVAS HOST
+  Installed into dist/ by scaffold.py. Regenerated on every scaffold; edits here
+  are lost. To change it, change assets/canvas/canvas.html in the plugin.
+
+  A .dc.html is a canvas DOCUMENT: it carries
+      <meta name="design_doc_mode" content="canvas">
+  and expects a host application to supply the canvas, the zoom and the prop
+  editor. Served from a plain static server there is no host, which is why the
+  document renders but nothing pans, zooms or toggles. That absence reads as a
+  script failure, and was reported as one during the first production run.
+
+  This file is that host. It does not mock the protocol — it speaks the one
+  support.js already implements:
+
+      parent -> doc   postMessage {type:'__dc_theme', theme:'dark'|'light'}
+                      window.__dcSetProps(rootName, {theme, showLabels})
+      doc -> parent   postMessage {type:'__dc_booted', rootName, propsMeta}
+
+  It is part of the BUNDLE, not of the EXPORT: it never touches the .dc.html, so
+  scaffold verify / lint / measure still describe real artboards rather than a
+  transformed canvas.
+
+  Requires a same-origin server. Over file:// the browser gives the iframe an
+  opaque origin, the bridge is blocked, and a banner says so — pan and zoom still
+  work. `dscc.py preview` starts the right server and opens this page.
+-->
+<style>
+/* JetBrains Mono, vendored as a data: URI by scaffold.py — see FONT-LICENSE.md.
+   The canvas is the one part of this toolchain a designer looks at, so its
+   typography must not be a function of network conditions. There is no <link>
+   to a font CDN anywhere in this file and no request leaves the page. */
+__FONT_FACE__
+
+  :root{
+    /* the one UI face, used by every control, label and readout. Locked here so
+       a fallback can never change the metrics of the chrome. */
+    --ui-font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+    /* the two canvas grounds support.js itself uses (CANVAS_BG_LIGHT / DARK) */
+    --canvas-light:#f0eee6;
+    --canvas-dark:#2e2c26;
+    --ui-fg:#f5f3ee;
+    --ui-bg:rgba(28,26,22,.82);
+    --ui-solid:#1c1a16;
+    --ui-bd:rgba(255,255,255,.14);
+    --ui-hv:rgba(255,255,255,.10);
+    --ui-mute:rgba(245,243,238,.55);
+    --hot:#fe2c02;
+    --ok:#4ade80;
+    --warn:#fbbf24;
+  }
+  html[data-app-theme="light"]{
+    --ui-fg:#1c1a16;
+    --ui-bg:rgba(255,255,255,.88);
+    --ui-solid:#faf9f6;
+    --ui-bd:rgba(0,0,0,.12);
+    --ui-hv:rgba(0,0,0,.06);
+    --ui-mute:rgba(28,26,22,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden;
+    background:var(--canvas-dark);
+    font: 500 12px/1 var(--ui-font);
+    letter-spacing:.08em;
+    transition:background .18s ease;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* Every control inherits the UI face. Buttons, inputs and kbd elements do NOT
+     inherit font-family from body by default — they take the OS widget font —
+     which is how a monospace interface ends up with a proportional zoom readout
+     and a search box in the system UI face. */
+  button, input, select, textarea, kbd, dl, dt, dd, h1, h2, p, svg text{
+    font-family: var(--ui-font);
+  }
+  #zoomPct, #cardPos, .badge .sc, .row .n{ font-variant-numeric: tabular-nums }
+  html[data-app-theme="light"] body{background:var(--canvas-light)}
+
+  /* ── canvas ─────────────────────────────────────────────────────────── */
+  #canvas{position:fixed; inset:0; overflow:hidden; cursor:grab; touch-action:none}
+  #canvas.panning{cursor:grabbing}
+  #stage{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform}
+  #doc{
+    display:block; border:0; background:transparent;
+    /* the canvas owns every gesture: a wheel event over a cross-document iframe
+       never reaches this window, so the frame is visual only */
+    pointer-events:none;
+  }
+  /* Overlay lives in SCREEN space, not doc space, and is recomputed each frame.
+     Inside the transform it would scale to 3px type at fit-width, which is the
+     same as not having it. */
+  #overlay{position:fixed; inset:0; pointer-events:none; z-index:5; display:none}
+  #overlay.on{display:block}
+  .badge{
+    position:absolute; pointer-events:auto; cursor:pointer;
+    display:flex; align-items:center; gap:6px; white-space:nowrap;
+    padding:5px 9px; border-radius:8px; font-size:11px; line-height:1;
+    background:var(--ui-solid); color:var(--ui-fg);
+    border:1px solid var(--ui-bd);
+    box-shadow:0 6px 18px -10px rgba(0,0,0,.7);
+    transform:translateY(-100%);
+  }
+  .badge .sc{font-weight:700; font-variant-numeric:tabular-nums}
+  .badge.pass .sc{color:var(--ok)}
+  .badge.warn .sc{color:var(--warn)}
+  .badge.fail .sc{color:var(--hot)}
+  .badge .codes{color:var(--ui-mute); font-size:10px}
+  .ring{position:absolute; border:2px solid transparent; border-radius:2px; pointer-events:none}
+  .ring.fail{border-color:var(--hot)}
+  .ring.warn{border-color:var(--warn)}
+  .ring.focus{border-color:var(--hot); border-width:3px}
+
+  /* ── clusters ───────────────────────────────────────────────────────── */
+  .cluster{
+    position:fixed; z-index:10; display:flex; align-items:center; gap:2px;
+    padding:4px; border-radius:999px;
+    background:var(--ui-bg); color:var(--ui-fg);
+    border:1px solid var(--ui-bd);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    box-shadow:0 8px 28px -12px rgba(0,0,0,.5);
+    user-select:none;
+  }
+  #themeCluster{top:16px; right:16px}
+  #zoomCluster{bottom:16px; right:16px}
+  #cardCluster{bottom:16px; left:50%; transform:translateX(-50%); display:none}
+  #cardCluster.on{display:flex}
+
+  .btn{
+    appearance:none; border:0; background:transparent; color:inherit;
+    font:inherit; letter-spacing:inherit;
+    height:34px; min-width:34px; padding:0 10px;
+    border-radius:999px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn:hover{background:var(--ui-hv)}
+  .btn:active{transform:translateY(.5px)}
+  .btn:focus-visible{outline:2px solid var(--hot); outline-offset:1px}
+  .btn[aria-pressed="true"]{background:var(--ui-hv)}
+  .btn svg{width:16px; height:16px; display:block}
+  .btn.mini{height:28px; min-width:28px; padding:0 8px; font-size:11px}
+  #zoomPct{min-width:64px; font-variant-numeric:tabular-nums; text-align:center}
+  #cardPos{min-width:78px; text-align:center; font-variant-numeric:tabular-nums}
+  .sep{width:1px; height:20px; background:var(--ui-bd); margin:0 2px}
+
+  /* ── index rail ─────────────────────────────────────────────────────── */
+  #index{
+    position:fixed; top:0; left:0; bottom:0; width:268px; z-index:12;
+    background:var(--ui-bg); color:var(--ui-fg);
+    border-right:1px solid var(--ui-bd);
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    display:flex; flex-direction:column;
+    transform:translateX(-100%); transition:transform .22s cubic-bezier(.4,0,.2,1);
+  }
+  #index.on{transform:none}
+  #indexHead{
+    padding:14px 16px 10px; border-bottom:1px solid var(--ui-bd);
+    display:flex; flex-direction:column; gap:8px;
+  }
+  #indexTitle{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-mute)}
+  #search{
+    width:100%; height:30px; padding:0 10px; border-radius:8px;
+    background:var(--ui-hv); border:1px solid var(--ui-bd); color:inherit;
+    font:inherit; font-size:11px; letter-spacing:.04em; outline:none;
+  }
+  #search:focus{border-color:var(--hot)}
+  #indexList{flex:1; overflow-y:auto; padding:6px 8px 16px}
+  #indexList::-webkit-scrollbar{width:8px}
+  #indexList::-webkit-scrollbar-thumb{background:var(--ui-bd); border-radius:8px}
+  .row{
+    display:flex; align-items:flex-start; gap:9px; width:100%;
+    padding:8px 9px; border-radius:9px; cursor:pointer;
+    background:transparent; border:0; color:inherit; font:inherit;
+    text-align:left; letter-spacing:.03em;
+  }
+  .row:hover{background:var(--ui-hv)}
+  .row.current{background:var(--ui-hv); box-shadow:inset 2px 0 0 var(--hot)}
+  .row .n{font-size:10px; color:var(--ui-mute); min-width:20px; padding-top:1px;
+          font-variant-numeric:tabular-nums}
+  .row .nm{font-size:11px; line-height:1.45; flex:1; min-width:0;
+           overflow:hidden; text-overflow:ellipsis}
+  .row .dot{width:6px; height:6px; border-radius:50%; margin-top:4px; flex:none;
+            background:transparent}
+  .row .dot.fail{background:var(--hot)}
+  .row .dot.warn{background:var(--warn)}
+  .row .dot.pass{background:var(--ok)}
+
+  /* ── minimap ────────────────────────────────────────────────────────── */
+  #minimap{
+    position:fixed; right:16px; top:64px; z-index:9; width:96px;
+    border-radius:12px; overflow:hidden; cursor:pointer;
+    background:var(--ui-bg); border:1px solid var(--ui-bd);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    box-shadow:0 8px 28px -12px rgba(0,0,0,.5);
+    display:none;
+  }
+  #minimap.on{display:block}
+  #minimap svg{display:block; width:100%}
+  #minimap .mm-card{fill:currentColor; opacity:.30}
+  #minimap .mm-card.fail{fill:var(--hot); opacity:.85}
+  #minimap .mm-card.cur{fill:var(--hot); opacity:1}
+  #minimap .mm-view{fill:none; stroke:var(--hot); stroke-width:2; vector-effect:non-scaling-stroke}
+
+  /* ── status / hints ─────────────────────────────────────────────────── */
+  #status{
+    position:fixed; left:16px; bottom:16px; z-index:10;
+    display:flex; align-items:center; gap:10px;
+    padding:9px 14px; border-radius:999px;
+    background:var(--ui-bg); color:var(--ui-fg);
+    border:1px solid var(--ui-bd);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    transition:opacity .3s ease;
+  }
+  #status.dim{opacity:.5}
+  #live{width:7px; height:7px; border-radius:50%; background:var(--ui-mute); flex:none}
+  #live.on{background:var(--ok); box-shadow:0 0 0 3px rgba(74,222,128,.18)}
+  #live.hit{background:var(--hot); box-shadow:0 0 0 3px rgba(254,44,2,.22)}
+  #statusText{white-space:nowrap; font-size:11px}
+  #warn{
+    position:fixed; left:16px; top:16px; z-index:14; max-width:440px;
+    padding:11px 15px; border-radius:14px; line-height:1.55; font-size:11px;
+    background:var(--hot); color:#000; letter-spacing:.04em; display:none;
+  }
+
+  /* ── key map ────────────────────────────────────────────────────────── */
+  #keys{
+    position:fixed; inset:0; z-index:20; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(0,0,0,.62); backdrop-filter:blur(4px);
+  }
+  #keys.on{display:flex}
+  #keysCard{
+    width:min(560px, calc(100vw - 48px)); max-height:calc(100vh - 64px); overflow:auto;
+    padding:26px 30px; border-radius:18px; line-height:1;
+    background:var(--ui-solid); color:var(--ui-fg); border:1px solid var(--ui-bd);
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.8);
+  }
+  #keysCard h2{margin:0 0 4px; font-size:13px; letter-spacing:.16em; text-transform:uppercase}
+  #keysCard p{margin:0 0 20px; font-size:11px; line-height:1.6; color:var(--ui-mute); letter-spacing:.04em}
+  .kgrid{display:grid; grid-template-columns:auto 1fr; gap:11px 16px; align-items:center}
+  .kgrid dt{display:flex; gap:4px}
+  .kgrid dd{margin:0; font-size:11px; color:var(--ui-mute); letter-spacing:.04em; line-height:1.4}
+  kbd{
+    display:inline-block; min-width:22px; padding:4px 6px; text-align:center;
+    font:inherit; font-size:10px; border-radius:5px;
+    background:var(--ui-hv); border:1px solid var(--ui-bd);
+  }
+  #keysClose{margin-top:22px; width:100%; height:34px; border-radius:9px;
+             background:var(--ui-hv); border:1px solid var(--ui-bd); color:inherit;
+             font:inherit; font-size:11px; letter-spacing:.12em; cursor:pointer}
+
+  /* ── presenter ──────────────────────────────────────────────────────── */
+  html.presenting .cluster,
+  html.presenting #index,
+  html.presenting #minimap,
+  html.presenting #status,
+  html.presenting #overlay{display:none !important}
+  html.presenting #canvas{cursor:default}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important} }
+  @media (max-width:760px){
+    #index{width:min(268px, 82vw)}
+    #minimap{display:none !important}
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas">
+  <div id="stage">
+    <iframe id="doc" src="__DOC_SRC__" scrolling="no" title="__DOC_TITLE__"></iframe>
+  </div>
+</div>
+
+<div id="overlay"></div>
+
+<nav id="index" aria-label="Card index">
+  <div id="indexHead">
+    <div id="indexTitle">__DOC_TITLE__</div>
+    <input id="search" type="search" placeholder="filter formats…" autocomplete="off" spellcheck="false">
+  </div>
+  <div id="indexList" role="list"></div>
+</nav>
+
+<div id="minimap" title="Click to travel"></div>
+
+<div class="cluster" id="themeCluster">
+  <button class="btn" id="indexBtn" type="button" aria-pressed="false" title="Card index (I)" aria-label="Card index">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+  </button>
+  <button class="btn" id="auditBtn" type="button" aria-pressed="false" title="Audit overlay (A)" aria-label="Audit overlay">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5m0 14h16"/><path d="M8 16V11M12 16V7M16 16v-3"/></svg>
+  </button>
+  <button class="btn" id="labelBtn" type="button" aria-pressed="true" title="Format labels (L)" aria-label="Format labels">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h7l7.5 6-7.5 6h-7A2.5 2.5 0 0 1 3 15.5Z"/></svg>
+  </button>
+  <span class="sep"></span>
+  <button class="btn" id="themeBtn" type="button" aria-pressed="true" title="Toggle dark mode (D)">
+    <span id="themeIcon"></span><span id="themeLabel">DARK</span>
+  </button>
+</div>
+
+<div class="cluster" id="zoomCluster">
+  <button class="btn" id="zoomOut" type="button" title="Zoom out (−)" aria-label="Zoom out">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h14"/></svg>
+  </button>
+  <button class="btn" id="zoomPct" type="button" title="Reset to 100% (0)">100%</button>
+  <button class="btn" id="zoomIn" type="button" title="Zoom in (+)" aria-label="Zoom in">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <span class="sep"></span>
+  <button class="btn" id="fitBtn" type="button" title="Fit whole gallery (1)">FIT</button>
+  <button class="btn" id="fitWBtn" type="button" title="Fit to width (2)">WIDTH</button>
+  <button class="btn" id="focusBtn" type="button" title="Focus one card (F)">FOCUS</button>
+  <span class="sep"></span>
+  <button class="btn" id="helpBtn" type="button" title="Keyboard map (?)" aria-label="Keyboard map">?</button>
+</div>
+
+<div class="cluster" id="cardCluster">
+  <button class="btn mini" id="prevBtn" type="button" title="Previous card ([)">&#8592;</button>
+  <span id="cardPos">01 / 50</span>
+  <button class="btn mini" id="nextBtn" type="button" title="Next card (])">&#8594;</button>
+  <span class="sep"></span>
+  <button class="btn mini" id="presentBtn" type="button" title="Presenter mode (P)">PRESENT</button>
+</div>
+
+<div id="status"><span id="live"></span><span id="statusText">READY</span></div>
+<div id="warn"></div>
+
+<div id="keys" role="dialog" aria-modal="true" aria-label="Keyboard map">
+  <div id="keysCard">
+    <h2>Canvas</h2>
+    <p>Drag or scroll to pan. ⌘/Ctrl + scroll zooms at the cursor. The document itself
+       is not interactive — the canvas owns every gesture, because a wheel event over a
+       cross-document iframe never reaches this window.</p>
+    <dl class="kgrid">
+      <dt><kbd>+</kbd><kbd>−</kbd></dt><dd>zoom in / out</dd>
+      <dt><kbd>0</kbd></dt><dd>actual size (100%)</dd>
+      <dt><kbd>1</kbd></dt><dd>fit the whole gallery</dd>
+      <dt><kbd>2</kbd></dt><dd>fit to width — the opening view</dd>
+      <dt><kbd>F</kbd></dt><dd>focus one artboard at review size</dd>
+      <dt><kbd>[</kbd><kbd>]</kbd></dt><dd>previous / next card</dd>
+      <dt><kbd>I</kbd></dt><dd>card index — click a format to fly to it</dd>
+      <dt><kbd>A</kbd></dt><dd>audit overlay — per-card score and defect codes</dd>
+      <dt><kbd>M</kbd></dt><dd>minimap</dd>
+      <dt><kbd>L</kbd></dt><dd>format labels (drives the library's own prop)</dd>
+      <dt><kbd>D</kbd></dt><dd>dark / light — canvas ground and library theme together</dd>
+      <dt><kbd>P</kbd></dt><dd>presenter mode — one card, no chrome</dd>
+      <dt><kbd>S</kbd></dt><dd>copy the shot command for the focused card</dd>
+      <dt><kbd>R</kbd></dt><dd>reload the document</dd>
+      <dt><kbd>?</kbd></dt><dd>this map</dd>
+    </dl>
+    <button id="keysClose" type="button">CLOSE</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const CARD_W = __CARD_W__, CARD_H = __CARD_H__;
+  const DEFAULT_DARK = __DEFAULT_DARK__;
+  const DOC_SRC = "__DOC_SRC__";
+  const STORE_KEY = "dscc.canvas." + DOC_SRC;
+
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("canvas"), stage = $("stage"), frame = $("doc");
+  const overlay = $("overlay"), pctEl = $("zoomPct");
+  const statusEl = $("status"), statusText = $("statusText"), live = $("live");
+  const warn = $("warn"), indexEl = $("index"), indexList = $("indexList");
+  const minimap = $("minimap"), cardCluster = $("cardCluster"), cardPos = $("cardPos");
+
+  const MIN = 0.03, MAX = 4;
+  let scale = 1, tx = 0, ty = 0;
+  let docW = CARD_W * 5, docH = CARD_H * 10;
+  let measured = false, booted = false, bridged = false, rootName = null;
+  let dark = DEFAULT_DARK, labels = true;
+  let cards = [], current = 0, focusMode = false, presenting = false;
+  let scorecard = null, project = null;
+  let showIndex = false, showAudit = false, showMap = false;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  // ── transform ─────────────────────────────────────────────────────────
+  let rafPending = false;
+  function render() {
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    pctEl.textContent = Math.round(scale * 100) + "%";
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => { rafPending = false; paintOverlay(); paintMinimap(); });
+    }
+  }
+
+  function zoomAt(cx, cy, next) {
+    next = clamp(next, MIN, MAX);
+    if (next === scale) return;
+    // keep the document point under the cursor pinned to the cursor
+    tx = cx - (cx - tx) * (next / scale);
+    ty = cy - (cy - ty) * (next / scale);
+    scale = next;
+    render(); persist();
+  }
+  const zoomCentre = (n) => zoomAt(innerWidth / 2, innerHeight / 2, n);
+
+  function fit() {
+    const pad = 48;
+    scale = clamp(Math.min((innerWidth - pad * 2) / docW, (innerHeight - pad * 2) / docH), MIN, MAX);
+    tx = (innerWidth - docW * scale) / 2; ty = pad;
+    exitFocus(); render(); persist();
+  }
+
+  // The opening view. Fitting the WHOLE gallery lands near 5% on a document this
+  // tall, which is not a view of anything; fitting the width puts a full row on
+  // screen at roughly the size a carousel is actually consumed at in a feed.
+  function fitWidth() {
+    const pad = 48;
+    scale = clamp((innerWidth - pad * 2) / docW, MIN, MAX);
+    tx = pad; ty = pad;
+    exitFocus(); render(); persist();
+  }
+
+  function actualSize() {
+    const cx = innerWidth / 2, cy = innerHeight / 2;
+    zoomAt(cx, cy, 1);
+  }
+
+  // Centre within the VISIBLE canvas, not the window: with the index rail open
+  // the left 268px are not canvas, and centring in the window puts the card
+  // half behind the panel.
+  function flyTo(rect, margin = 64, maxScale = 0.62) {
+    const left = showIndex ? 268 : 0;
+    const vw = innerWidth - left;
+    const s = clamp(Math.min((vw - margin * 2) / rect.w,
+                             (innerHeight - margin * 2) / rect.h), MIN, maxScale);
+    scale = s;
+    tx = left + (vw - rect.w * s) / 2 - rect.x * s;
+    ty = (innerHeight - rect.h * s) / 2 - rect.y * s;
+    render(); persist();
+  }
+
+  // ── document sizing ───────────────────────────────────────────────────
+  function measure() {
+    let d = null;
+    try { d = frame.contentDocument; } catch (e) { d = null; }
+    if (!d || !d.body) return false;
+    const w = Math.max(d.documentElement.scrollWidth, d.body.scrollWidth);
+    const h = Math.max(d.documentElement.scrollHeight, d.body.scrollHeight);
+    if (!w || !h) return false;
+    docW = w; docH = h;
+    frame.style.width = w + "px";
+    frame.style.height = h + "px";
+    collectCards(d);
+    return true;
+  }
+
+  // Card geometry drives the index, focus mode, the overlay and the minimap.
+  // Read from the document itself rather than from the plan, so it reflects what
+  // actually rendered.
+  function collectCards(d) {
+    const nodes = d.querySelectorAll("[data-card], .frame");
+    if (!nodes.length) return;
+    const seen = new Set(), out = [];
+    nodes.forEach((el) => {
+      if (seen.has(el)) return;
+      seen.add(el);
+      const r = el.getBoundingClientRect();
+      if (r.width < 40 || r.height < 40) return;
+      const sx = d.documentElement.scrollLeft || d.body.scrollLeft || 0;
+      const sy = d.documentElement.scrollTop || d.body.scrollTop || 0;
+      // the label sits in the wrapper above the artboard
+      let name = el.getAttribute("data-layout") || "";
+      const wrap = el.parentElement;
+      if (wrap) {
+        const lab = wrap.firstElementChild;
+        if (lab && lab !== el && lab.textContent) {
+          const t = lab.textContent.trim();
+          if (t && t.length < 90) name = t;
+        }
+      }
+      out.push({
+        index: out.length + 1,
+        card: el.getAttribute("data-card") || String(out.length + 1),
+        name: name || `card ${out.length + 1}`,
+        mechanic: el.getAttribute("data-mechanic") || "",
+        x: r.left + sx, y: r.top + sy, w: r.width, h: r.height,
+      });
+    });
+    if (out.length) { cards = out; buildIndex(); }
+  }
+
+  // ── audit data ────────────────────────────────────────────────────────
+  // Served by dscc.py preview from outside dist/, deliberately and read-only, so
+  // the bundle itself stays self-contained and still works on a plain static
+  // server (where these fetches just 404 and the overlay stays empty).
+  async function loadAudit() {
+    for (const url of ["./__dscc/state", "../audit/scorecard.json"]) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) continue;
+        const j = await r.json();
+        scorecard = j.scorecard || (j.total !== undefined ? j : null);
+        project = j.project || project;
+        if (scorecard) break;
+      } catch (e) { /* static server: expected */ }
+    }
+    if (scorecard) {
+      const t = scorecard.total, g = scorecard.gate;
+      setStatus(`SCORE ${t} · ${g}` + (scorecard.unscored && scorecard.unscored.length
+        ? ` · unscored: ${scorecard.unscored.join(",")}` : ""));
+      $("auditBtn").disabled = false;
+      buildIndex(); paintOverlay();
+    }
+  }
+
+  function cardScore(i) {
+    if (!scorecard || !scorecard.cards) return null;
+    return scorecard.cards.find((c) => c.index === i) || null;
+  }
+  function grade(row) {
+    if (!row) return "";
+    if (row.defects && row.defects.some((d) => d.severity === "P0")) return "fail";
+    if (row.score < 85) return "warn";
+    return "pass";
+  }
+
+  // ── overlay ───────────────────────────────────────────────────────────
+  function paintOverlay() {
+    if (!showAudit) { overlay.classList.remove("on"); return; }
+    overlay.classList.add("on");
+    const frag = document.createDocumentFragment();
+    const vw = innerWidth, vh = innerHeight;
+    cards.forEach((c) => {
+      const x = c.x * scale + tx, y = c.y * scale + ty;
+      const w = c.w * scale, h = c.h * scale;
+      if (x + w < -80 || y + h < -80 || x > vw + 80 || y > vh + 80) return;  // cull
+      const row = cardScore(c.index), g = grade(row);
+      if (g === "fail" || g === "warn" || c.index === current + 1) {
+        const ring = document.createElement("div");
+        ring.className = "ring " + (c.index === current + 1 && focusMode ? "focus" : g);
+        ring.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+        frag.appendChild(ring);
+      }
+      if (w < 90) return;                     // too small to read a badge on
+      const b = document.createElement("button");
+      b.className = "badge " + g;
+      b.style.cssText = `left:${x}px;top:${Math.max(26, y - 6)}px`;
+      const codes = row && row.defects
+        ? [...new Set(row.defects.map((d) => d.code))].slice(0, 3).join(" ") : "";
+      b.innerHTML = `<span class="sc">${row ? row.score.toFixed(0) : "··"}</span>`
+        + `<span>${String(c.card).padStart(2, "0")}</span>`
+        + (codes ? `<span class="codes">${codes}</span>` : "");
+      b.title = c.name + (codes ? "\n" + codes : "");
+      b.addEventListener("click", () => goTo(c.index - 1, true));
+      frag.appendChild(b);
+    });
+    overlay.replaceChildren(frag);
+  }
+
+  // ── index rail ────────────────────────────────────────────────────────
+  let filter = "";
+  function buildIndex() {
+    const frag = document.createDocumentFragment();
+    cards.forEach((c, i) => {
+      const hay = (c.name + " " + c.mechanic).toLowerCase();
+      if (filter && !hay.includes(filter)) return;
+      const row = cardScore(c.index), g = grade(row);
+      const b = document.createElement("button");
+      b.className = "row" + (i === current ? " current" : "");
+      b.setAttribute("role", "listitem");
+      b.innerHTML = `<span class="n">${String(c.card).padStart(2, "0")}</span>`
+        + `<span class="nm"></span><span class="dot ${g}"></span>`;
+      b.querySelector(".nm").textContent = c.name;
+      b.title = c.mechanic || c.name;
+      b.addEventListener("click", () => goTo(i, true));
+      frag.appendChild(b);
+    });
+    indexList.replaceChildren(frag);
+  }
+  $("search").addEventListener("input", (e) => {
+    filter = e.target.value.trim().toLowerCase(); buildIndex();
+  });
+
+  // ── minimap ───────────────────────────────────────────────────────────
+  function paintMinimap() {
+    if (!showMap || !cards.length) { minimap.classList.remove("on"); return; }
+    minimap.classList.add("on");
+    const H = Math.min(innerHeight - 180, 420);
+    const s = Math.min(96 / docW, H / docH);
+    const w = docW * s, h = docH * s;
+    const parts = cards.map((c, i) => {
+      const g = grade(cardScore(c.index));
+      const cls = i === current ? "cur" : (g === "fail" ? "fail" : "");
+      return `<rect class="mm-card ${cls}" x="${c.x * s}" y="${c.y * s}" `
+           + `width="${Math.max(1, c.w * s)}" height="${Math.max(1, c.h * s)}" rx="0.5"/>`;
+    }).join("");
+    const vx = -tx / scale * s, vy = -ty / scale * s;
+    const vw = innerWidth / scale * s, vh = innerHeight / scale * s;
+    minimap.innerHTML =
+      `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="color:currentColor">`
+      + parts
+      + `<rect class="mm-view" x="${vx}" y="${vy}" width="${vw}" height="${vh}"/></svg>`;
+    minimap.__s = s;
+  }
+  minimap.addEventListener("click", (e) => {
+    const s = minimap.__s; if (!s) return;
+    const r = minimap.getBoundingClientRect();
+    const dx = (e.clientX - r.left) / s, dy = (e.clientY - r.top) / s;
+    tx = innerWidth / 2 - dx * scale;
+    ty = innerHeight / 2 - dy * scale;
+    render(); persist();
+  });
+
+  // ── focus / navigation ────────────────────────────────────────────────
+  function goTo(i, fly) {
+    if (!cards.length) return;
+    current = (i + cards.length) % cards.length;
+    const c = cards[current];
+    cardPos.textContent = `${String(c.card).padStart(2, "0")} / ${String(cards.length).padStart(2, "0")}`;
+    if (fly) flyTo(c, presenting ? 0 : 64, presenting ? 4 : 0.62);
+    buildIndex(); paintOverlay(); paintMinimap();
+    const cur = indexList.querySelector(".row.current");
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+  }
+  function enterFocus() {
+    focusMode = true; cardCluster.classList.add("on");
+    $("focusBtn").setAttribute("aria-pressed", "true");
+    goTo(current, true);
+  }
+  function exitFocus() {
+    focusMode = false; cardCluster.classList.remove("on");
+    $("focusBtn").setAttribute("aria-pressed", "false");
+    if (presenting) togglePresent(false);
+  }
+  function togglePresent(on) {
+    presenting = on === undefined ? !presenting : on;
+    document.documentElement.classList.toggle("presenting", presenting);
+    if (presenting) { focusMode = true; goTo(current, true); }
+    else if (focusMode) goTo(current, true);
+  }
+
+  // ── theme ─────────────────────────────────────────────────────────────
+  // One control, two effects, because they are two different things in this
+  // format: the LIBRARY theme is a component prop (Black | White), and the canvas
+  // ground is app chrome that support.js paints on receiving __dc_theme.
+  const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>';
+  const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M20 13.4A8.2 8.2 0 1 1 10.6 4a6.6 6.6 0 0 0 9.4 9.4Z"/></svg>';
+
+  function paintChrome() {
+    document.documentElement.setAttribute("data-app-theme", dark ? "dark" : "light");
+    $("themeIcon").innerHTML = dark ? MOON : SUN;
+    $("themeLabel").textContent = dark ? "DARK" : "LIGHT";
+    $("themeBtn").setAttribute("aria-pressed", String(dark));
+  }
+
+  // support.js injects `html,body{background:<canvas ground>}` once it sees
+  // design_doc_mode=canvas, but the library's own `body{background:var(--canvas)}`
+  // sits later in the cascade and wins. Clearing the authored ground at RUNTIME
+  // (the file on disk is untouched) lets the host rule through, so the artboards
+  // float directly on the canvas the way they do in the real host.
+  function blendDoc() {
+    try {
+      const d = frame.contentDocument;
+      if (d && d.body) d.body.style.background = "transparent";
+    } catch (e) {}
+  }
+
+  function pushProps() {
+    blendDoc();
+    try {
+      frame.contentWindow.postMessage(
+        { type: "__dc_theme", theme: dark ? "dark" : "light" }, "*");
+    } catch (e) {}
+    try {
+      const w = frame.contentWindow;
+      const name = rootName || (w.__dcRootName && w.__dcRootName());
+      if (name && w.__dcSetProps) {
+        w.__dcSetProps(name, { theme: dark ? "Black" : "White", showLabels: labels });
+        bridged = true;
+      }
+    } catch (e) {}
+  }
+  function setTheme(next) { dark = next; paintChrome(); pushProps(); persist(); }
+  function setLabels(next) {
+    labels = next;
+    $("labelBtn").setAttribute("aria-pressed", String(labels));
+    pushProps(); persist();
+    setTimeout(() => { measure(); render(); }, 60);   // labels change the layout height
+  }
+
+  addEventListener("message", (e) => {
+    if (e.source !== frame.contentWindow) return;
+    const d = e.data;
+    if (!d || d.type !== "__dc_booted") return;
+    rootName = d.rootName || rootName;
+    booted = true;
+    pushProps();
+    measure(); render();
+  });
+
+  // ── pointer ───────────────────────────────────────────────────────────
+  let dragging = false, lastX = 0, lastY = 0, pid = null, movedPx = 0;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 && e.button !== 1) return;
+    dragging = true; pid = e.pointerId; movedPx = 0;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.classList.add("panning");
+    canvas.setPointerCapture(pid);
+    e.preventDefault();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    movedPx += Math.abs(dx) + Math.abs(dy);
+    tx += dx; ty += dy; lastX = e.clientX; lastY = e.clientY;
+    render();
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false; canvas.classList.remove("panning");
+    if (pid !== null) { try { canvas.releasePointerCapture(pid); } catch (e) {} }
+    pid = null; persist();
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  // double-click empty canvas focuses the card under the cursor
+  canvas.addEventListener("dblclick", (e) => {
+    const dx = (e.clientX - tx) / scale, dy = (e.clientY - ty) / scale;
+    const hit = cards.findIndex((c) => dx >= c.x && dx <= c.x + c.w && dy >= c.y && dy <= c.y + c.h);
+    if (hit >= 0) { current = hit; enterFocus(); }
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    dimStatus();
+    if (e.ctrlKey || e.metaKey) {
+      // a trackpad pinch arrives as ctrl+wheel; exponential keeps the step even
+      zoomAt(e.clientX, e.clientY, scale * Math.exp(-e.deltaY / 320));
+      return;
+    }
+    if (e.shiftKey) tx -= e.deltaY + e.deltaX;
+    else { tx -= e.deltaX; ty -= e.deltaY; }
+    render(); persist();
+  }, { passive: false });
+
+  // ── keyboard ──────────────────────────────────────────────────────────
+  addEventListener("keydown", (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (e.key === "Escape") e.target.blur();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    const stop = () => e.preventDefault();
+    if (k === "=" || k === "+") { zoomCentre(scale * 1.2); stop(); }
+    else if (k === "-" || k === "_") { zoomCentre(scale / 1.2); stop(); }
+    else if (k === "0") { actualSize(); stop(); }
+    else if (k === "1") { fit(); stop(); }
+    else if (k === "2") { fitWidth(); stop(); }
+    else if (k === "d" || k === "D") setTheme(!dark);
+    else if (k === "l" || k === "L") setLabels(!labels);
+    else if (k === "i" || k === "I") toggleIndex();
+    else if (k === "a" || k === "A") toggleAudit();
+    else if (k === "m" || k === "M") toggleMap();
+    else if (k === "f" || k === "F") { focusMode ? exitFocus() : enterFocus(); stop(); }
+    else if (k === "p" || k === "P") togglePresent();
+    else if (k === "r" || k === "R") reloadDoc();
+    else if (k === "s" || k === "S") copyShotCmd();
+    else if (k === "?" || k === "/") { $("keys").classList.toggle("on"); stop(); }
+    else if (k === "[" || k === "PageUp") { goTo(current - 1, true); stop(); }
+    else if (k === "]" || k === "PageDown") { goTo(current + 1, true); stop(); }
+    else if (k === "Escape") {
+      if ($("keys").classList.contains("on")) $("keys").classList.remove("on");
+      else if (presenting) togglePresent(false);
+      else if (focusMode) exitFocus();
+      else if (showIndex) toggleIndex();
+    }
+    else if (k === "ArrowLeft")  { focusMode ? goTo(current - 1, true) : (tx += 120, render()); stop(); }
+    else if (k === "ArrowRight") { focusMode ? goTo(current + 1, true) : (tx -= 120, render()); stop(); }
+    else if (k === "ArrowUp")    { if (!focusMode) { ty += 120; render(); } stop(); }
+    else if (k === "ArrowDown")  { if (!focusMode) { ty -= 120; render(); } stop(); }
+  });
+
+  // ── toggles ───────────────────────────────────────────────────────────
+  const RAIL_W = 268;
+  function toggleIndex() {
+    showIndex = !showIndex;
+    indexEl.classList.toggle("on", showIndex);
+    $("indexBtn").setAttribute("aria-pressed", String(showIndex));
+    // Slide the canvas out from under the rail rather than covering the first
+    // column with it. A panel that hides the thing you opened it to reach is a
+    // panel you close again immediately.
+    tx += showIndex ? RAIL_W : -RAIL_W;
+    render(); persist();
+  }
+  function toggleAudit() {
+    showAudit = !showAudit;
+    $("auditBtn").setAttribute("aria-pressed", String(showAudit));
+    if (showAudit && !scorecard) {
+      setStatus("no scorecard — run dscc audit, then reload", 4000);
+    }
+    paintOverlay(); persist();
+  }
+  function toggleMap() {
+    showMap = !showMap; paintMinimap(); persist();
+  }
+
+  function copyShotCmd() {
+    const c = cards[current];
+    if (!c) return;
+    const cmd = `python dscc.py shots "${DOC_SRC}" shots/  # card ${c.card}: ${c.name}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(cmd).catch(() => {});
+    setStatus("shot command copied", 2600);
+  }
+
+  // ── live reload ───────────────────────────────────────────────────────
+  // The preview server watches the project and pushes `reload`. View state is
+  // restored across the reload, so rebuild-and-look is one second rather than
+  // six of re-finding your place.
+  function reloadDoc() {
+    const keep = { scale, tx, ty, current, focusMode };
+    live.className = "hit";
+    setStatus("reloading…");
+    frame.addEventListener("load", () => {
+      setTimeout(() => {
+        measure();
+        scale = keep.scale; tx = keep.tx; ty = keep.ty;
+        current = keep.current; focusMode = keep.focusMode;
+        render(); pushProps(); loadAudit();
+        live.className = "on";
+        setStatus("reloaded " + new Date().toLocaleTimeString(), 2600);
+      }, 140);
+    }, { once: true });
+    frame.contentWindow.location.reload();
+  }
+
+  function connectLive() {
+    if (!window.EventSource) return;
+    let es;
+    try { es = new EventSource("./__dscc/events"); } catch (e) { return; }
+    es.addEventListener("open", () => { live.className = "on"; });
+    es.addEventListener("reload", () => reloadDoc());
+    es.addEventListener("audit", () => loadAudit());
+    es.addEventListener("error", () => { live.className = ""; });
+  }
+
+  // ── status / persistence ──────────────────────────────────────────────
+  let statusTimer = null, baseStatus = "READY";
+  function setStatus(text, revertAfter) {
+    statusText.textContent = text;
+    statusEl.classList.remove("dim");
+    clearTimeout(statusTimer);
+    if (revertAfter) statusTimer = setTimeout(() => { statusText.textContent = baseStatus; dimStatus(); }, revertAfter);
+    else { baseStatus = text; statusTimer = setTimeout(dimStatus, 5000); }
+  }
+  function dimStatus() { statusEl.classList.add("dim"); }
+
+  function persist() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(
+        { scale, tx, ty, dark, labels, showIndex, showAudit, showMap, current }));
+    } catch (e) {}
+  }
+  function restore() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+      if (!s) return false;
+      scale = clamp(s.scale || 1, MIN, MAX); tx = s.tx || 0; ty = s.ty || 0;
+      dark = s.dark !== undefined ? s.dark : DEFAULT_DARK;
+      labels = s.labels !== undefined ? s.labels : true;
+      current = s.current || 0;
+      if (s.showIndex) toggleIndex();
+      if (s.showAudit) { showAudit = true; $("auditBtn").setAttribute("aria-pressed", "true"); }
+      if (s.showMap) showMap = true;
+      $("labelBtn").setAttribute("aria-pressed", String(labels));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ── controls ──────────────────────────────────────────────────────────
+  $("zoomIn").addEventListener("click", () => zoomCentre(scale * 1.2));
+  $("zoomOut").addEventListener("click", () => zoomCentre(scale / 1.2));
+  $("fitBtn").addEventListener("click", fit);
+  $("fitWBtn").addEventListener("click", fitWidth);
+  $("focusBtn").addEventListener("click", () => focusMode ? exitFocus() : enterFocus());
+  $("prevBtn").addEventListener("click", () => goTo(current - 1, true));
+  $("nextBtn").addEventListener("click", () => goTo(current + 1, true));
+  $("presentBtn").addEventListener("click", () => togglePresent());
+  $("themeBtn").addEventListener("click", () => setTheme(!dark));
+  $("labelBtn").addEventListener("click", () => setLabels(!labels));
+  $("indexBtn").addEventListener("click", toggleIndex);
+  $("auditBtn").addEventListener("click", toggleAudit);
+  $("helpBtn").addEventListener("click", () => $("keys").classList.toggle("on"));
+  $("keysClose").addEventListener("click", () => $("keys").classList.remove("on"));
+  $("keys").addEventListener("click", (e) => { if (e.target === $("keys")) $("keys").classList.remove("on"); });
+  pctEl.addEventListener("click", actualSize);
+
+  addEventListener("resize", () => { if (!measured) fitWidth(); else { render(); paintMinimap(); } });
+
+  // ── boot ──────────────────────────────────────────────────────────────
+  const hadState = restore();
+  paintChrome();
+
+  frame.addEventListener("load", () => {
+    // Fonts change the gallery height, so measure again once they land.
+    [0, 120, 400, 900, 1800].forEach((t) => setTimeout(() => {
+      const ok = measure();
+      if (ok && !measured) {
+        measured = true;
+        if (!hadState) fitWidth(); else render();
+        goTo(current, false);
+      } else if (ok) { render(); }
+      pushProps();
+    }, t));
+
+    setTimeout(() => {
+      let reachable = true;
+      try { reachable = !!frame.contentDocument; } catch (e) { reachable = false; }
+      if (!reachable) {
+        warn.style.display = "block";
+        warn.innerHTML = "Opened over <b>file://</b> — the browser gives the iframe an opaque "
+          + "origin, so the theme bridge, the card index and the audit overlay are all blocked. "
+          + "Pan and zoom still work. Run <b>dscc.py preview</b> for the whole thing.";
+        docW = CARD_W * 5 + 700; docH = CARD_H * 11;
+        frame.style.width = docW + "px"; frame.style.height = docH + "px";
+        if (!hadState) fitWidth();
+      } else if (!booted) {
+        setStatus("document rendered, runtime did not announce itself", 6000);
+      }
+    }, 2400);
+  });
+
+  loadAudit();
+  connectLive();
+  if (!localStorage.getItem("dscc.canvas.seen")) {
+    $("keys").classList.add("on");
+    try { localStorage.setItem("dscc.canvas.seen", "1"); } catch (e) {}
+  }
+  setStatus("READY · ? for keys");
+  render();
+
+  // Scripting hook — makes the viewer inspectable from the console without
+  // having to read this file.
+  window.__canvas = {
+    get state() {
+      return { scale, tx, ty, docW, docH, dark, labels, rootName, bridged, booted,
+               cards: cards.length, current, focusMode, presenting,
+               showIndex, showAudit, showMap, scored: !!scorecard };
+    },
+    get cards() { return cards; },
+    fit, fitWidth, actualSize, measure, goTo, reloadDoc, loadAudit,
+    zoom: (v) => zoomCentre(v),
+    theme: (t) => setTheme(t === "dark" || t === true),
+    audit: (on) => { showAudit = !on; toggleAudit(); },
+    index: (on) => { showIndex = !on; toggleIndex(); },
+  };
+})();
+</script>
+</body>
+</html>

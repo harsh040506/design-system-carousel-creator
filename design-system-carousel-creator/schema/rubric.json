@@ -1,0 +1,74 @@
+{
+  "$comment": [
+    "Anchored rubric for the judged Craft dimension (20 of 100 points).",
+    "Five sub-criteria, scored 1-5 from RENDERED PNGs -- never from source code.",
+    "Every deduction must cite a card index and a visible reason; score.py discards",
+    "unanchored deductions on merge, which is the only defence against a judged",
+    "score that drifts to a comfortable 3-on-everything."
+  ],
+  "version": "1.0.0",
+  "scale": "1-5 integer per sub-criterion, mean scaled to 20 points",
+  "criteria": {
+    "hierarchy": {
+      "question": "Does the eye know where to start, and is there exactly one entry point?",
+      "anchors": {
+        "5": "One element is dramatically dominant. Reading order is unambiguous within a second. Secondary elements clearly support rather than compete.",
+        "4": "Clear dominant element; one secondary element is slightly louder than it should be.",
+        "3": "A hierarchy exists but two elements compete for first read.",
+        "2": "Three or more elements at similar weight; the eye wanders before settling.",
+        "1": "Flat. Everything is the same size. Reads as a spreadsheet or a wall of text."
+      }
+    },
+    "social_native": {
+      "question": "Does this read as a social post, or as a webpage / slide deck / report?",
+      "anchors": {
+        "5": "Unmistakably a carousel slide. Poster logic. No interface chrome anywhere.",
+        "4": "Reads as a post; one element (a tag, a panel) carries faint UI flavour.",
+        "3": "Ambiguous -- could be a slide from a deck.",
+        "2": "Contains something clickable-looking: a button, a tab, a form field, a pricing tier.",
+        "1": "A screenshot of a product UI or a page of a document with a headline on it."
+      }
+    },
+    "thumbnail": {
+      "question": "At 1/3.6 scale (300px wide), does the idea still land?",
+      "anchors": {
+        "5": "Headline and the single key element are legible and the point is clear at thumbnail size.",
+        "4": "Headline legible; supporting detail lost, which is acceptable.",
+        "3": "Headline readable only with effort.",
+        "2": "Nothing legible but the general shape reads as branded.",
+        "1": "An illegible grey texture."
+      }
+    },
+    "copy": {
+      "question": "Is this poster copy or is it prose that has been set large?",
+      "anchors": {
+        "5": "One claim, stated in under nine words, with supporting rows under twenty. Nothing could be cut.",
+        "4": "Tight; one line runs slightly long.",
+        "3": "Clear but wordy; subordinate clauses present.",
+        "2": "Full paragraphs. The slide is carrying two ideas.",
+        "1": "Pasted source text. Reads as documentation."
+      }
+    },
+    "interest": {
+      "question": "Is the card worth looking at, or merely correct?",
+      "anchors": {
+        "5": "A compositional idea is present -- a bled motif, an asymmetry, a scale jump, a deliberate void. Distinct from its neighbours at a glance.",
+        "4": "Well composed, one clear device, slightly conventional.",
+        "3": "Correct and unremarkable. Would not be noticed in a feed.",
+        "2": "Generic layout that could belong to any brand.",
+        "1": "A default. Boxes in a grid with text in them."
+      }
+    }
+  },
+  "output_contract": {
+    "format": "JSON matching {cards:[{index, hierarchy:{score,reason}, social_native:{...}, thumbnail:{...}, copy:{...}, interest:{...}, note}]}",
+    "rules": [
+      "Score every card in the library; do not sample.",
+      "Any score below 5 REQUIRES a `reason` naming what is visibly wrong. No reason means the deduction is discarded and the sub-criterion scores 5.",
+      "Reasons must describe what is visible in the image, not what you infer about the code.",
+      "Do not score Integrity, Discipline, Density, Distinction or Veracity -- those are measured, and a second opinion on them is noise. If a rendering looks broken, say so in `note` and move on.",
+      "Do not adjust scores to hit a target distribution. If forty cards deserve a 4 on hierarchy, give forty 4s."
+    ]
+  },
+  "calibration_note": "A 3 is 'correct and unremarkable', not 'average of what I have seen'. Most competent output lands at 3-4. A library of 5s means the rubric is not being applied."
+}

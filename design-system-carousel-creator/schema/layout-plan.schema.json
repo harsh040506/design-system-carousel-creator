@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-system-carousel-creator/layout-plan.schema.json",
+  "title": "Layout Plan",
+  "description": "Fifty mechanic tuples, planned as a set before any card is built. Building cards one at a time produces reasonable local choices and a repetitive library, because you never see the set. This file IS the set.",
+  "type": "object",
+  "required": ["cards"],
+  "properties": {
+    "library": { "type": "string" },
+    "artboard": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      }
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["index", "layout", "section", "partition", "flow", "enumerator", "emphasis", "media", "chrome", "claims", "intent"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 1 },
+          "layout": { "type": "string", "description": "Human-readable name, unique across the library" },
+          "mechanic": { "type": "string", "description": "Rendered as partition:flow:enumerator:emphasis:media:chrome and written to data-mechanic in the build" },
+          "section": {
+            "type": "string",
+            "enum": ["hook", "ground", "tension", "method", "proof", "voice", "depth", "objection", "application", "structure"]
+          },
+
+          "partition": { "type": "string", "enum": ["monolith", "stack", "duo", "triad", "grid", "rail", "chain", "strip", "ledger", "overlay"] },
+          "flow": { "type": "string", "enum": ["vertical", "horizontal", "z", "radial", "centred"] },
+          "enumerator": { "type": "string", "enum": ["none", "number", "pip", "rule", "chip", "icon", "glyph"] },
+          "emphasis": { "type": "string", "enum": ["display", "figure", "media", "quote", "panel", "diagram"] },
+          "media": { "type": "string", "enum": ["none", "inset", "sidecar", "full-bleed", "repeated"] },
+          "chrome": {
+            "type": "string",
+            "enum": ["paper", "panel", "ink", "accent-1", "accent-2", "grey", "flush"],
+            "description": "The surface GROUND: a full colour treatment (ground plus every text role recoloured), not a background swap. A library must use at least 5 named grounds -- a light/dark pair is the most common failure in generated work. Loud grounds (ink, accent-1, accent-2) must never sit on adjacent cards."
+          },
+
+          "claims": {
+            "type": "array", "minItems": 1,
+            "items": { "type": "string", "pattern": "^c[0-9]{3}$" },
+            "description": "Claim ids this card is assembled from. Written to data-claim in the build so the veracity check is a lookup."
+          },
+          "rows": { "type": "integer", "description": "Planned content rows. Cross-checked against a 'few-rows' license." },
+
+          "intent": {
+            "type": "string", "enum": ["fill", "breathe"],
+            "default": "fill",
+            "description": "fill = distribute rows across the card (correct for ~40 of 50). breathe = fixed rhythm from the top, slack collects at the bottom as one block."
+          },
+          "license": {
+            "type": "string",
+            "enum": ["cover", "close", "single-figure", "media-led", "few-rows", "section-break"],
+            "description": "REQUIRED when intent is 'breathe'. The license is recorded, not remembered -- the auditor cross-checks it, which is what stops it decaying into marking everything 'breathe'."
+          },
+          "headline": { "type": "string" },
+          "notes": { "type": "string", "description": "Composition intent for the compositor" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "intent": { "const": "breathe" } }, "required": ["intent"] },
+            "then": { "required": ["license"] }
+          },
+          {
+            "if": { "properties": { "license": { "const": "few-rows" } }, "required": ["license"] },
+            "then": { "properties": { "rows": { "maximum": 4 } } }
+          }
+        ]
+      }
+    },
+    "distribution_check": {
+      "type": "object",
+      "description": "Filled in by uniq.py. Targets per 50 cards: media 14-20, figure-emphasis 8-12, >=8 partitions used, <=9 cards per partition, mean pairwise distance >= 2.6, >=5 surface grounds. Ground mix: paper 20-26, panel 6-9, ink 6-9, accent-1 4-6, accent-2 2-4, grey 3-5.",
+      "additionalProperties": true
+    }
+  }
+}

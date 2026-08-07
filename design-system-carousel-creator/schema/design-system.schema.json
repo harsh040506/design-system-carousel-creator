@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-system-carousel-creator/design-system.schema.json",
+  "title": "Design System Contract",
+  "description": "The closed set of legal values for a template library. Everything downstream validates against this, so drift becomes impossible rather than discouraged.",
+  "type": "object",
+  "required": ["brand", "canvas", "themes", "type", "figures", "weights", "spacing", "radii", "motif", "rules", "coverage"],
+  "properties": {
+    "brand": { "type": "string" },
+    "source": { "type": "string", "description": "What the system was distilled from" },
+    "coverage": {
+      "type": "number", "minimum": 0, "maximum": 1,
+      "description": "Fraction of the contract taken from the source rather than derived. Reported so the user knows how much of the result is their brand and how much is the Creator's judgement."
+    },
+    "canvas": {
+      "type": "object", "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "const": 1080 },
+        "height": { "type": "integer", "enum": [1350, 1440, 1080] },
+        "ratio": { "type": "string" },
+        "rhythm": { "type": "integer", "default": 64, "description": "Reference unit for the density auditor's gap ceiling" }
+      }
+    },
+    "themes": {
+      "type": "object", "required": ["light", "dark"],
+      "description": "Two COMPLETE role maps. Dark is not light with a filter applied.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["--surface", "--surface-2", "--surface-3", "--ink", "--muted", "--faint", "--on-ink", "--rule", "--plate-bg", "--plate-fg", "--plate-mute", "--plate-rule", "--plate-well"],
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "constant": {
+      "type": "object",
+      "description": "Theme-independent tokens: accents, fixed panel palettes, on-photo colours.",
+      "additionalProperties": { "type": "string" }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["--font-display", "--font-body", "--font-mono"],
+      "additionalProperties": { "type": "string" },
+      "$comment": "Record substitutions for unavailable brand faces in `substitutions`, matched by skeleton (x-height, contrast, terminals) rather than by feel."
+    },
+    "substitutions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["specified", "used", "why"],
+        "properties": {
+          "specified": { "type": "string" },
+          "used": { "type": "string" },
+          "why": { "type": "string" }
+        }
+      }
+    },
+    "type": {
+      "type": "object",
+      "description": "Nine steps. Every text node uses exactly one and sets no font properties of its own.",
+      "required": ["--t-kicker", "--t-display", "--t-heading", "--t-heading-sm", "--t-body-xl", "--t-body-lg", "--t-body-sm", "--t-caption", "--t-mono"],
+      "additionalProperties": { "type": "string", "pattern": "^[0-9.]+px$" }
+    },
+    "figures": {
+      "type": "object",
+      "description": "Numbers are graphics, not headings: their own ramp, tighter and lighter.",
+      "required": ["--f-hero", "--f-lg", "--f-md", "--f-sm", "--f-xs"],
+      "additionalProperties": { "type": "string", "pattern": "^[0-9.]+px$" }
+    },
+    "weights": {
+      "type": "object",
+      "required": ["--w-display", "--w-body", "--w-med", "--w-bold"],
+      "additionalProperties": { "type": ["string", "integer"] }
+    },
+    "spacing": {
+      "type": "object",
+      "description": "Seven values. An eighth is a symptom that a layout is fighting the system.",
+      "required": ["--s0", "--s1", "--s2", "--s3", "--s4", "--s5", "--s6"],
+      "additionalProperties": { "type": "string", "pattern": "^[0-9.]+px$" }
+    },
+    "radii": {
+      "type": "object",
+      "required": ["--r-pill", "--r-card", "--r-tile", "--r-icon"],
+      "additionalProperties": { "type": "string" }
+    },
+    "texture": {
+      "type": "object",
+      "required": ["--grain"],
+      "properties": { "--grain": { "type": "string", "description": "feTurbulence data-URI. Not optional: a flat gradient reads as a default." } }
+    },
+    "motif": {
+      "type": "object",
+      "required": ["name", "description", "css", "frequency"],
+      "description": "The recurring non-typographic graphic. This does more to make fifty compositions read as one family than colour or font does.",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "css": { "type": "string" },
+        "frequency": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.33 },
+        "never": { "type": "array", "items": { "type": "string" } },
+        "derived": { "type": "boolean", "description": "True when no motif was present in the source and this one was invented" }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "description": "Brand prose turned into enforcement.",
+      "items": {
+        "type": "object",
+        "required": ["rule"],
+        "properties": {
+          "rule": { "type": "string" },
+          "check": { "type": "string", "description": "Lint rule that enforces it, where one exists" },
+          "source": { "type": "string", "enum": ["stated", "derived"] }
+        }
+      }
+    },
+    "anti_instructions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The brand's don'ts plus the social-medium don'ts. Passed to the compositor as hard constraints."
+    },
+    "derived": {
+      "type": "object",
+      "description": "Map of token -> rationale for every value the Creator invented rather than read.",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

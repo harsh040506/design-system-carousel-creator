@@ -1,0 +1,337 @@
+/* dscc:kernel-begin — copy-verbatim region. The linter skips OFF_SCALE inside
+   these sentinels, because flagging px values in a file it instructs you to copy
+   verbatim is the tool contradicting itself. Keep both markers if you vendor it. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM CAROUSEL CREATOR — KERNEL
+   Brand-agnostic primitive layer for fixed-artboard social carousel libraries.
+
+   This file contains ZERO brand values. Every colour, font and figure comes
+   from a variable that /design-system-carousel-creator:distill writes into a preceding :root block.
+   Copy this file verbatim into the built library; never edit it per-brand.
+
+   Contract with the linter:
+     · card markup may not contain raw px, raw hex, or inline font-size
+     · every visual value must resolve through a var() declared by distill
+     · a value that isn't on a scale below is a defect, not a judgement call
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── SCALES ─────────────────────────────────────────────────────────────────
+   Written by distill. Listed here as the required key set — a library missing
+   any of these will fail `dscc lint --undeclared`.
+
+   REQUIRED FROM DISTILL
+   colour roles : --surface --surface-2 --surface-3 --ink --muted --faint
+                  --on-ink --rule --accent --accent-2
+   inverse plate: --plate-bg --plate-fg --plate-mute --plate-rule --plate-well
+   type         : --font-display --font-body --font-mono
+   type ramp    : --t-display --t-heading --t-heading-sm --t-body-xl
+                  --t-body-lg --t-body-sm --t-caption --t-mono --t-kicker
+   figure ramp  : --f-hero --f-lg --f-md --f-sm --f-xs
+   weights      : --w-display --w-body --w-med --w-bold
+   texture      : --grain (data-URI feTurbulence)
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root{
+  /* Spacing — 4px half-step on an 8px base. THESE VALUES ONLY.
+     Seven steps is enough for any card. An eighth is a symptom. */
+  --s0:4px; --s1:8px; --s2:16px; --s3:20px; --s4:24px; --s5:32px; --s6:40px;
+
+  /* Radii — three roles, no others */
+  --r-pill:9999px; --r-card:20px; --r-tile:20px; --r-icon:17px;
+
+  /* Artboard — identical on every card in a library */
+  --card-w:1080px; --card-h:1350px;
+  --card-px:68px; --card-pt:64px; --card-pb:56px;
+
+  /* Rhythm step — the density auditor's reference unit.
+     Max legal gap between sibling rows is 1.5x this. */
+  --rhythm:64px;
+}
+
+/* ═══ ARTBOARD ══════════════════════════════════════════════════════════════
+   Fixed pixels, not responsive. What you see is the export size. The whole
+   system depends on this: if the frame can reflow, nothing below is
+   measurable, and the auditor has nothing to stand on. */
+
+/* box-sizing is not a style preference here, it is the artboard contract.
+   .frame declares width + height AND padding; under the default content-box
+   the padding is ADDED, so a 1080x1440 artboard with 68px sides and 64/56px
+   ends renders at 1216x1553. Nothing errors. measure.py happily measures the
+   wrong box and every geometric number downstream -- coverage, gaps, slack --
+   is computed against an artboard that does not exist. One line prevents it. */
+.frame, .frame *{box-sizing:border-box}
+
+.frame{
+  position:relative; width:var(--card-w); height:var(--card-h); flex:none;
+  overflow:hidden; display:flex; flex-direction:column;
+  background:var(--surface); color:var(--ink);
+  padding:var(--card-pt) var(--card-px) var(--card-pb);
+}
+.frame.plate{background:var(--plate-bg); color:var(--plate-fg)}
+.frame.tinted{background:var(--surface-2)}
+.frame.flush{padding:0}                    /* full-bleed media cards only */
+
+.inner{position:relative; flex:1; display:flex; flex-direction:column; min-height:0}
+.frame.flush .inner{padding:var(--card-pt) var(--card-px) var(--card-pb)}
+
+/* ═══ CHROME ════════════════════════════════════════════════════════════════
+   Masthead and footer are the identity thread. They appear on every card in
+   exactly the same place, which is what lets fifty different compositions
+   still read as one library. Never move them. Never skip them. */
+
+.masthead{
+  flex:none; display:flex; align-items:baseline; justify-content:space-between;
+  font:var(--w-med) var(--t-mono)/1 var(--font-mono);
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+}
+.masthead .mh-r{color:var(--faint)}
+.plate .masthead{color:var(--plate-fg)}
+.plate .masthead .mh-r{color:var(--plate-mute)}
+
+.foot{
+  flex:none; display:flex; align-items:baseline; justify-content:space-between;
+  margin-top:var(--s5); padding-top:var(--s4);
+  border-top:1px solid var(--rule);
+  font:var(--w-med) var(--t-mono)/1 var(--font-mono);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+}
+.plate .foot{border-top-color:var(--plate-rule); color:var(--plate-mute)}
+
+/* ═══ CARD HEADER ═══════════════════════════════════════════════════════════
+   One component, one rhythm, fifty cards. The margins live here and nowhere
+   else — a card that sets its own header spacing is drift. */
+
+.fill{flex:1; min-height:0; display:flex; flex-direction:column}
+
+.head{flex:none; padding-top:var(--s6)}
+.head > * + *{margin-top:var(--s3)}       /* title → standfirst */
+.head .kicker + *{margin-top:var(--s2)}   /* kicker → title tightens */
+.head + *{margin-top:var(--s5)}           /* header → content region */
+
+/* ═══ TYPE ══════════════════════════════════════════════════════════════════
+   Nine steps. Every text node in every card uses exactly one of these classes
+   and sets no font properties of its own. This is the single highest-leverage
+   rule in the system — it is why a fifty-card library can be re-typed by
+   editing nine numbers. */
+
+.kicker     {font:var(--w-bold) var(--t-kicker)/1 var(--font-mono);
+             letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+.display    {font:var(--w-display) var(--t-display)/0.96 var(--font-display); letter-spacing:-0.025em}
+.heading    {font:var(--w-display) var(--t-heading)/1.08 var(--font-display); letter-spacing:-0.018em}
+.heading-sm {font:var(--w-display) var(--t-heading-sm)/1.14 var(--font-display); letter-spacing:-0.012em}
+.body-xl    {font:var(--w-body) var(--t-body-xl)/1.34 var(--font-body); color:var(--ink)}
+.body-lg    {font:var(--w-body) var(--t-body-lg)/1.4 var(--font-body); color:var(--muted)}
+.body-sm    {font:var(--w-body) var(--t-body-sm)/1.48 var(--font-body); color:var(--muted)}
+.caption    {font:var(--w-body) var(--t-caption)/1.45 var(--font-body); color:var(--faint)}
+.mono-sm    {font:var(--w-med) var(--t-mono)/1.4 var(--font-mono); color:var(--faint)}
+
+.plate .body-xl,.plate .body-lg,.plate .body-sm,
+.plate .caption,.plate .mono-sm,.plate .kicker{color:var(--plate-mute)}
+.ink{color:var(--ink)} .plate .ink{color:var(--plate-fg)}
+.med{font-weight:var(--w-med)}
+
+/* Figures — a separate ramp from headings on purpose. A number is a graphic
+   element, not a heading, and wants to be bigger and tighter than one. */
+.fig-hero{font:var(--w-display) var(--f-hero)/0.86 var(--font-display); letter-spacing:-0.035em}
+.fig-lg  {font:var(--w-display) var(--f-lg)/0.88   var(--font-display); letter-spacing:-0.025em}
+.fig     {font:var(--w-display) var(--f-md)/1.0    var(--font-display); letter-spacing:-0.02em}
+.fig-sm  {font:var(--w-display) var(--f-sm)/1.0    var(--font-display); letter-spacing:-0.02em}
+.fig-xs  {font:var(--w-display) var(--f-xs)/1.0    var(--font-display); letter-spacing:-0.02em}
+
+/* ═══ SURFACES ══════════════════════════════════════════════════════════════ */
+
+.hairline{border-top:1px solid var(--rule)}
+.plate .hairline{border-top-color:var(--plate-rule)}
+
+.panel{background:var(--surface-2); border-radius:var(--r-card); padding:var(--s5)}
+.plate .panel{background:var(--plate-well)}
+.tile{background:var(--surface-2); border-radius:var(--r-tile); padding:var(--s4);
+      display:flex; flex-direction:column; gap:var(--s2)}
+.plate .tile{background:var(--plate-well)}
+
+.tag{display:inline-flex; align-items:center; gap:11px;
+     font:var(--w-bold) var(--t-mono)/1 var(--font-mono);
+     background:var(--surface-2); color:var(--ink);
+     padding:10px 20px; border-radius:var(--r-pill)}
+.plate .tag{background:var(--plate-well); color:var(--plate-fg)}
+.tag-mute{color:var(--faint)}
+.tags{display:flex; flex-wrap:wrap; gap:12px}
+
+.mark{background:var(--surface-3); padding:2px 10px; border-radius:6px; color:var(--ink)}
+.plate .mark{background:var(--plate-well); color:var(--plate-fg)}
+
+.row{display:flex; align-items:center}
+.col{display:flex; flex-direction:column}
+
+/* ═══ ENUMERATORS ═══════════════════════════════════════════════════════════
+   What marks an item in a list. Swapping the enumerator is one of the six
+   axes of layout distinction — three cards with identical structure read as
+   three different cards if one numbers, one pips, and one uses icon tiles. */
+
+.icon-tile{width:60px; height:60px; border-radius:var(--r-icon); flex:none;
+           background:var(--surface-2); display:flex; align-items:center; justify-content:center}
+.plate .icon-tile{background:var(--plate-well)}
+.icon-tile svg{width:26px; height:26px}
+
+.num-chip{width:46px; height:46px; border-radius:50%; flex:none;
+          background:var(--surface-2); color:var(--ink);
+          display:flex; align-items:center; justify-content:center;
+          font:var(--w-bold) var(--t-mono)/1 var(--font-mono)}
+.plate .num-chip{background:var(--plate-well); color:var(--plate-fg)}
+
+/* ═══ MOTIF + TEXTURE ═══════════════════════════════════════════════════════
+   Every library needs one recurring non-typographic graphic. Distill defines
+   what it is; the kernel only defines how it's built. Grain is what keeps a
+   flat gradient from looking like a default — it is the cheapest single
+   upgrade in the whole system. */
+
+.motif{position:relative; overflow:hidden; flex:none;
+       border-radius:var(--motif-radius, 50%);
+       background:var(--motif-fill)}
+.motif::after{content:''; position:absolute; inset:0;
+              background-image:var(--grain); background-size:240px 240px;
+              mix-blend-mode:overlay; opacity:.75}
+
+.bleed{position:absolute; inset:0; overflow:hidden}
+.bleed::after{content:''; position:absolute; inset:0;
+              background-image:var(--grain); background-size:240px 240px;
+              mix-blend-mode:overlay; opacity:.4}
+.scrim{position:absolute; inset:0; pointer-events:none;
+       background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.1) 42%,rgba(0,0,0,.72) 100%)}
+
+.dot-grid{position:absolute; pointer-events:none;
+          background-image:radial-gradient(var(--rule) 2.5px,transparent 2.5px);
+          background-size:22px 22px}
+
+/* Full-bleed photo cards: one class re-colours every text role at once, so a
+   photo card can never be half-legible. */
+.on-photo{color:var(--on-photo-fg)}
+.on-photo .masthead,.on-photo .heading,.on-photo .display,.on-photo .ink{color:var(--on-photo-fg)}
+.on-photo .kicker,.on-photo .caption,.on-photo .masthead .mh-r{color:var(--on-photo-mute)}
+.on-photo .body-sm,.on-photo .body-lg{color:var(--on-photo-soft)}
+.on-photo .foot{border-top-color:var(--on-photo-rule); color:var(--on-photo-mute)}
+.on-photo .tag{background:var(--on-photo-well); color:var(--on-photo-fg)}
+.on-photo .hairline{border-top-color:var(--on-photo-rule)}
+
+/* ═══ DATA ══════════════════════════════════════════════════════════════════ */
+
+.bar-track{height:15px; border-radius:8px; background:var(--surface-3); overflow:hidden}
+.plate .bar-track{background:var(--plate-well)}
+.bar-fill{height:100%; border-radius:8px; background:var(--ink)}
+.bar-mute{background:var(--faint)}
+.plate .bar-fill{background:var(--plate-fg)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILL vs. BREATHE — read density-law.md before touching this.
+
+   DEFAULT: content regions fill the card, distributing rows evenly. Correct
+   when leftover space is small; the rows then read as a deliberate table.
+
+   OPT OUT with the `-top` modifier: rows keep a fixed rhythm and the leftover
+   space collects at the BOTTOM as one clean block. Correct when a card
+   carries few rows, where distributing would blow the gaps apart.
+
+   The opt-out is a LICENSE, not a preference. It must be declared in the
+   manifest as intent:"breathe" with a reason the auditor recognises. An
+   undeclared `-top` is a defect; so is a distributed card whose gaps exceed
+   1.5x --rhythm, because that is the same slack wearing a disguise.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* — stack: ruled rows, the workhorse — */
+.stack{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:space-between}
+.stack-top{flex:0 0 auto; justify-content:flex-start}
+.stack > *{padding:var(--s5) 0; border-top:1px solid var(--rule)}
+.stack > *:first-child{border-top:0; padding-top:0}
+.stack-tight > *{padding:var(--s3) 0}
+.plate .stack > *{border-top-color:var(--plate-rule)}
+
+/* — hang: big hanging numeral beside a block — */
+.hang{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:space-between}
+.hang-top{flex:0 0 auto; justify-content:flex-start; gap:var(--s6)}
+.hang > div{display:flex; gap:var(--s4); align-items:baseline}
+.hang .hn{flex:0 0 92px; font:var(--w-display) var(--t-heading)/1 var(--font-display);
+          letter-spacing:-0.02em; color:var(--faint)}
+.hang .col{min-width:0; gap:var(--s0)}
+.plate .hang .hn{color:var(--plate-mute)}
+
+/* — rail: vertical timeline with pips — */
+.rail{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:space-between;
+      padding-left:var(--s6); border-left:1px solid var(--rule)}
+.rail-top{flex:0 0 auto; justify-content:flex-start; gap:var(--s6)}
+.rail > div{position:relative}
+.rail .pip{position:absolute; left:-41px; top:6px; width:16px; height:16px;
+           border-radius:50%; background:var(--ink)}
+.rail .pip-accent{background:var(--accent)}
+.plate .rail{border-left-color:var(--plate-rule)}
+.plate .rail .pip{background:var(--plate-fg)}
+
+/* — chain: horizontal steps divided by rules — */
+.chain{display:flex; align-items:flex-start}
+.chain > .step{flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--s1);
+               padding-left:var(--s4); border-left:1px solid var(--rule)}
+.chain > .step:first-child{border-left:0; padding-left:0}
+.plate .chain > .step{border-left-color:var(--plate-rule)}
+
+/* — strip: full-height vertical columns — */
+.strip{flex:1; min-height:0; display:grid}
+.strip > div{min-width:0; display:flex; flex-direction:column; gap:var(--s2);
+             padding-left:var(--s4); border-left:1px solid var(--rule)}
+.strip > div:first-child{border-left:0; padding-left:0}
+.plate .strip > div{border-left-color:var(--plate-rule)}
+
+/* — idx: two-column index, label left / value right — */
+.idx{flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr;
+     gap:0 var(--s6); align-content:space-between}
+.idx-top{align-content:start; gap:var(--s4) var(--s6)}
+.idx > div{display:flex; justify-content:space-between; gap:var(--s2);
+           padding:var(--s3) 0; border-bottom:1px solid var(--rule)}
+.plate .idx > div{border-bottom-color:var(--plate-rule)}
+
+/* — cmp: comparison table with a total rule — */
+.cmp{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:space-between}
+.cmp-top{flex:0 0 auto; justify-content:flex-start; gap:var(--s4)}
+.cmp > div{display:grid; grid-template-columns:1.15fr 1fr 1fr; gap:var(--s3);
+           align-items:center; padding-top:var(--s4); border-top:1px solid var(--rule)}
+.cmp > div:first-child{border-top:0; padding-top:0}
+.cmp .c{text-align:center}
+.cmp .total{border-top:2px solid var(--ink)}
+.plate .cmp > div{border-top-color:var(--plate-rule)}
+.plate .cmp .total{border-top-color:var(--plate-fg)}
+
+/* — duo: two full-height halves — */
+.duo{flex:1; min-height:0; display:flex; align-items:stretch}
+.duo > *{flex:1; min-width:0; display:flex; flex-direction:column;
+         justify-content:center; gap:var(--s3);
+         padding-left:var(--s5); border-left:1px solid var(--rule)}
+.duo > *:first-child{padding-left:0; padding-right:var(--s5); border-left:0}
+.plate .duo > *{border-left-color:var(--plate-rule)}
+
+/* — grid-fill: n x m tiles that stretch to the card — */
+.grid-fill{flex:1; min-height:0; display:grid; gap:var(--s3)}
+.g-2{grid-template-columns:1fr 1fr}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.r-2{grid-template-rows:repeat(2,minmax(0,1fr))}
+.r-3{grid-template-rows:repeat(3,minmax(0,1fr))}
+
+/* — small compositional helpers — */
+.lead{display:flex; align-items:center; gap:var(--s3)}
+.lead .col{gap:var(--s0); min-width:0}
+.ledger{display:flex; justify-content:space-between; align-items:baseline; gap:var(--s4)}
+.ledger .caption{text-align:right}
+.split{display:flex; gap:var(--s5); align-items:flex-start}
+.split .col{min-width:0}
+
+/* — media-row: image beside a text pane.
+     min-width:0 is load-bearing. Without it the pane refuses to shrink and
+     drives text straight through the frame edge. This exact omission has
+     broken this exact layout before. — */
+.media-row{flex:0 0 auto; display:flex; gap:var(--s5); align-items:flex-start}
+.media-row .pane{flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--s3)}
+.media-row img-slot{flex:0 0 400px}
+
+/* — note: a closing line pinned to the bottom rule.
+     Concluding asides belong at the bottom of the card, always. Floating one
+     in the middle of a stack makes it look like another row. — */
+.note{flex:none; margin-top:auto; padding-top:var(--s5)}
+
+/* dscc:kernel-end */

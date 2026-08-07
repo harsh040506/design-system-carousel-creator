@@ -1,0 +1,87 @@
+{
+  "$comment": [
+    "Provenance record for the fixed thresholds baked into scripts/score.py.",
+    "These values are CONSTANTS -- score.py does not read this file, does not read",
+    "any comparison library, and needs neither present to run. This file exists so",
+    "a threshold can be traced back to a measurement instead of asserted on vibes;",
+    "it is documentation of how the numbers were chosen during development, not a",
+    "runtime dependency. Library names have been generalised to A/B/C -- what",
+    "matters is the shape of the evidence, not which specific files produced it.",
+    "Anyone can reproduce or update this calibration against their own set with:",
+    "  python scripts/dscc.py bench <candidate> <comparison-library>..."
+  ],
+  "measured_on": "2026-08-05",
+  "harness": "measure.py, morphological-close coverage (R=2), outermost-container row gaps",
+  "sample_size": "3 professionally produced carousel template libraries, 40-250 cards each, none creator-built",
+  "observed_range": [
+    {
+      "cards": 40,
+      "coverage_mean": 0.687,
+      "gap_cv": 0.32,
+      "distinct_font_sizes": 43,
+      "slack_p50": 76,
+      "integrity": 18.8,
+      "discipline": 10.3,
+      "density": 19.2,
+      "shared_deterministic": 57.3
+    },
+    {
+      "cards": 60,
+      "coverage_mean": 0.675,
+      "gap_cv": 0.51,
+      "distinct_font_sizes": 48,
+      "slack_p50": 60,
+      "integrity": 16.5,
+      "discipline": 10.2,
+      "density": 17.5,
+      "shared_deterministic": 53.1
+    },
+    {
+      "cards": 250,
+      "coverage_mean": 0.226,
+      "gap_cv": 0.37,
+      "distinct_font_sizes": 68,
+      "integrity": 19.5,
+      "discipline": 10.0,
+      "density": 15.0,
+      "shared_deterministic": 53.5,
+      "note": "Auto-detection found 250 artboard-shaped elements in this file; low coverage likely reflects a genuinely minimal system plus some detection noise. Treated as a weak, low-confidence data point."
+    }
+  ],
+  "derived_thresholds": {
+    "coverage_floor": {
+      "value": 0.40,
+      "basis": "Observed sample mean coverage was 0.68-0.69 for two of the three libraries. A 0.40 per-card floor sits comfortably under both, so it rejects genuinely sparse cards without penalising well-composed work. Before a morphological-close fix to the coverage measurement, this floor was unreachable by every library in the sample -- which is how that measurement bug was originally found."
+    },
+    "coverage_ceiling": {
+      "value": 0.88,
+      "applies_to": "text-dominant cards only (media_boxes == 0)",
+      "basis": "An initial 0.78 ceiling flagged 22-28% of sample cards as overpacked -- a threshold failing, not a finding: a full-bleed photograph is 100% covered by design. Two corrections: raised to 0.88, and restricted to text-only cards. A card that is all text and still near-total coverage is the actual failure mode this threshold targets."
+    },
+    "gap_cv": {
+      "value": 0.35,
+      "basis": "The tightest library in the sample measured 0.32 gap coefficient-of-variation. Set at the best-observed value rather than the sample mean: the gate should reward matching the best available work, not the average of it."
+    },
+    "distinct_font_sizes": {
+      "full_at": 11,
+      "zero_at": 22,
+      "basis": "Sample libraries ran 43-68 distinct computed font sizes -- none locked a type ramp. A library holding under 22 already beats every library in the sample on this axis; under 11 means a nine-step ramp plus a figure ramp is genuinely being obeyed."
+    },
+    "slack_free": {
+      "value": 160,
+      "basis": "Sample median bottom slack was 60-76px. 160 leaves normal composition unflagged and catches only real holes."
+    },
+    "row_gap_ceiling": {
+      "formula": "1.5 * rhythm",
+      "value_at_64px_rhythm": 96,
+      "basis": "Rhythm-relative rather than absolute so it survives a change of artboard or type scale."
+    }
+  },
+  "known_limits": [
+    "Coverage is a 40x50 raster approximation of union area, not exact geometry. Stable across runs and slightly generous, which keeps it from becoming a nuisance metric.",
+    "Foreign libraries (no project manifest) are measured in degraded mode: artboard auto-detected, no intent licensing, distinction capped at 60%. Every degraded reading is scored in the foreign library's favour.",
+    "Webfont availability shifts text metrics. measure.py reports document.fonts.status; compare only runs with the same font state.",
+    "The 250-card sample's count is unverified and may include non-artboard elements of the same width -- treated as low-confidence throughout.",
+    "This sample is small (n=3). The thresholds are reasonable starting points, not statistically robust bounds. Re-running /design-system-carousel-creator:bench against a larger or different sample and updating this file is expected as the tool sees more use."
+  ]
+}

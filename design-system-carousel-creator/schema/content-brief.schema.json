@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-system-carousel-creator/content-brief.schema.json",
+  "title": "Content Brief",
+  "description": "Atomic claims extracted from source documents, each with provenance. Slides are ASSEMBLED from claims rather than written from memory of the material. Two things fall out for free: you can prove no number was invented, and when a card turns out under-written you have a shelf of unused real rows to pull from instead of reaching for padding.",
+  "type": "object",
+  "required": ["subject", "sources", "claims"],
+  "properties": {
+    "subject": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "path"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "lines": { "type": "integer" }
+        }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "register": { "type": "string" },
+        "person": { "type": "string" },
+        "avoid": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "arc": {
+      "type": "array",
+      "description": "Narrative sections in order, each naming the claim ids it draws on.",
+      "items": {
+        "type": "object",
+        "required": ["section", "cards", "claims"],
+        "properties": {
+          "section": { "type": "string", "enum": ["hook", "ground", "tension", "method", "proof", "voice", "depth", "objection", "application", "structure"] },
+          "cards": { "type": "array", "items": { "type": "integer" } },
+          "claims": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 60,
+      "description": "Over-extract deliberately. A library of fifty cards needs far more than fifty claims, because the surplus is what resolves UNDERWRITTEN defects without inventing anything.",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "text", "source", "span"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^c[0-9]{3}$" },
+          "type": {
+            "type": "string",
+            "enum": ["stat", "definition", "contrast", "quote", "process", "milestone", "objection", "consequence", "example", "principle"]
+          },
+          "text": { "type": "string", "maxLength": 300, "description": "One assertion. If it needs 'and', it is two claims." },
+          "source": { "type": "string", "description": "Source id" },
+          "span": { "type": "string", "description": "Line range or locator in the source, e.g. 'L412-418'" },
+          "figure": { "type": "string", "description": "The number, if this claim carries one. Veracity checks numbers against these." },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5, "description": "How central this is to the argument. Drives which claims get a whole card." },
+          "verbatim": { "type": "boolean", "description": "True for quotes that must not be reworded" }
+        }
+      }
+    },
+    "unused_pool": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Claim ids not yet assigned to a card. The refiner draws from here to fix UNDERWRITTEN and SPARSE. When this empties, the answer is more extraction, not more spacing."
+    }
+  }
+}
