@@ -17,6 +17,7 @@ DSCC=${CLAUDE_PLUGIN_ROOT}/scripts        # or the plugin's scripts/ directory
 
 ```
 python dscc.py <command> [options]
+python dscc.py --version          # the plugin version, also recorded on every scorecard
 ```
 
 | Command | |
@@ -61,13 +62,13 @@ python dscc.py audit LIBRARY.dc.html          # anywhere
 | Flag | Default | |
 |---|---|---|
 | `--project DIR` | walk up | which project to read wiring from |
-| `--out DIR` | `audit/` | where the four JSON artifacts land |
+| `--out DIR` | `audit/` in a project, else `audit-out/` | where the four JSON artifacts land |
 | `--system` `--brief` `--plan` `--critic` | from manifest | override individually |
-| `--shots DIR` | `shots/` | per-card PNG output |
+| `--shots DIR` | `shots/` in a project, else none | per-card PNG output (stale `card-*.png` are cleared first) |
 | `--selector` | `.frame` | artboard selector |
 | `--auto` | off | auto-detect artboards (degraded mode) |
-| `--rhythm N` | from manifest | the density reference unit |
-| `--strict` | off | every P2 becomes a gate failure |
+| `--rhythm N` | from manifest, else 64 | the density reference unit; an explicit value wins |
+| `--strict` | off | every P2 becomes a gate failure, and so does an unscored Craft |
 | `--note "…"` | — | recorded in `history.jsonl` |
 | `--top N` | 8 | weakest cards to table |
 
@@ -95,7 +96,7 @@ Binds `127.0.0.1` only. Dies with the process.
 ### `bench`
 
 ```bash
-python dscc.py bench CANDIDATE.html OTHER1.html OTHER2.html --out bench-out
+python dscc.py bench CANDIDATE.html OTHER1.html OTHER2.html --out bench-out [--selector .frame] [--rhythm 64]
 ```
 
 Identical auditor over all of them, one table, caveats printed every run.
@@ -115,7 +116,7 @@ python project.py new "Acme Templates" --system DESIGN.md --source doc.pdf \
   --independent --no-source --forbid "Internal Only"
 python project.py list [ROOT]
 python project.py info [DIR]
-python project.py adopt OLD_DIR --name "Acme" --into projects/acme
+python project.py adopt OLD_DIR --name "Acme" --into projects/acme   # --into is the project folder itself
 python project.py set serve.port 5000
 python project.py set constraints.forbidden_terms '["Acme Confidential"]'
 ```
@@ -129,7 +130,8 @@ python project.py set constraints.forbidden_terms '["Acme Confidential"]'
 
 ```bash
 python scaffold.py init "dist/Acme.dc.html" --system build/design-system.json \
-  --title "Acme Templates" --cols 5 [--fonts-dir ./fonts] [--logos-dir ./logos]
+  --title "Acme Templates" --cols 5 [--fonts-dir ./fonts] [--logos-dir ./logos] \
+  [--fonts URL|none] [--eyebrow TEXT] [--blurb TEXT] [--no-builder]
 python scaffold.py verify "dist/Acme.dc.html" [--json]
 python scaffold.py runtime dist/                  # refresh support.js + image-slot.js
 python scaffold.py canvas dist/ [--document X.dc.html]
@@ -167,7 +169,8 @@ Exit `1` on any P0.
 ## `measure.py` — the geometry harness
 
 ```bash
-python measure.py LIBRARY.dc.html --out measure.json [--shots DIR] [--rhythm 64]
+python measure.py LIBRARY.dc.html --selector .frame --out measure.json [--shots DIR] [--rhythm 64]
+# omit --selector for degraded auto-detection (foreign libraries)
 ```
 
 Playwright + Chromium. Overflow, text collisions, ink coverage (morphological closing), row
@@ -229,18 +232,20 @@ those go through the Read tool or `pypdf`.
 |---|---|
 | `0` | success / gate PASS / READY |
 | `1` | gate FAIL, P0 defects present, verification failed, or NOT READY |
-| `2` | file not found, or nothing to audit |
+| `2` | `dscc audit` / `score.py`: an input file was not found, or nothing to audit |
 
 Suitable for CI directly:
 
 ```yaml
-- run: python scripts/dscc.py audit --strict
+- run: python scripts/dscc.py audit --strict --critic audit/critic.json   # --strict without a critic always fails
 ```
 
 ---
 
 ## A note on Windows
 
-All scripts call `sys.stdout.reconfigure(encoding="utf-8")` on import. If you wrap them in
-your own tooling, set `PYTHONIOENCODING=utf-8` — an arrow in a progress message is not worth a
+`dscc.py`, `project.py`, `scaffold.py`, `serve.py`, `report.py` and `slots.py` call
+`sys.stdout.reconfigure(encoding="utf-8")` on import; `lint.py`, `measure.py`, `uniq.py` and
+`score.py` do not. If you run those directly or wrap any of them in your own tooling, set
+`PYTHONIOENCODING=utf-8` — an arrow in a progress message is not worth a
 crashed audit run.

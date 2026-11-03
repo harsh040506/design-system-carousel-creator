@@ -1,6 +1,6 @@
 ---
 description: Render the whole project as one self-contained HTML report.
-argument-hint: [--no-open]
+argument-hint: "[--no-open]"
 allowed-tools: Bash, Read
 ---
 

@@ -37,7 +37,7 @@ card index and the audit overlay are all blocked. A banner in the canvas says so
 
 This is a browser security rule, not a bug. Use `dscc.py preview`.
 
-### `craft -- / 20` and the total is out of 80
+### `craft -- / 20` and the total is "scaled"
 
 Working as designed. Craft is the judged dimension; it needs the `design-critic` agent. Until
 you run it the scorecard carries a `NO_CRITIC` defect saying exactly this.
@@ -46,9 +46,16 @@ Run the agent over `shots/`, then re-score with `--critic audit/critic.json`.
 
 ### A request to `unpkg.com` in the network tab
 
-The vendored `support.js` runtime loads React and Babel from a CDN when the document renders.
-That is behaviour of the `.dc.html` runtime this plugin bundles, not of the plugin's own
-tooling. Building, auditing and the canvas chrome itself make no external requests.
+React and ReactDOM are vendored in `dist/vendor/` and mapped through `window.__resources`, so a
+current build makes no such request. If you still see one, the library was built by an older
+version: rebuild (`python build/build.py`) and run `scaffold.py verify`, which reports a missing
+`vendor/` folder or a missing `__resources` map. Babel is fetched lazily from unpkg only if a library
+uses `x-import` of a `.jsx` file, which generated libraries do not.
+
+### A request to `fonts.googleapis.com`
+
+The scaffold's default `--fonts` stylesheet. Blocked, the text falls back to a system face. For a
+bundle with no outside request, build with `--fonts none` and ship licensed faces via `--fonts-dir`.
 
 ---
 
@@ -165,9 +172,11 @@ pass reaches. Go back to `:brief` or `:plan`.
 
 ### `degraded mode` in the output
 
-No project manifest found, so the artboard was auto-detected and slack licensing can't be read.
+The artboard selector was not used — `--auto` was passed, the library is a bench reference, or
+`.frame` matched nothing — so artboards were auto-detected and slack licensing can't be read.
 Unlicensed slack is scored *in the library's favour* in this mode. Expected when auditing a
-foreign library; a problem if you meant to audit your own — check you're inside the project.
+foreign library; a problem if you meant to audit your own — drop `--auto`, and check the cards
+carry the `frame` class.
 
 ---
 

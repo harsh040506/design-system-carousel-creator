@@ -103,14 +103,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         sys.stderr.write(f"  ! {args[0] if args else ''} {code}\n")
 
     # ---- routes ----------------------------------------------------------
+    def _local_request(self) -> bool:
+        """True only for a request that came from this machine's own pages.
+
+        The /__dscc/ routes expose project.json and the scorecard. The canvas
+        reads them same-origin, so no CORS header is sent at all -- and a page on
+        some other site cannot read them cross-origin. The Host check closes the
+        DNS-rebinding route around that: a hostile name resolving to 127.0.0.1 is
+        same-origin to the browser but carries the wrong Host.
+        """
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            return False
+        origin = self.headers.get("Origin")
+        if origin:
+            o = urllib.parse.urlparse(origin).hostname or ""
+            if o.lower() not in ("127.0.0.1", "localhost", "::1"):
+                return False
+        return True
+
     def do_GET(self):  # noqa: N802
         route = urllib.parse.urlparse(self.path).path
-        if route.endswith("/__dscc/events"):
-            return self._sse()
-        if route.endswith("/__dscc/state"):
-            return self._state()
-        if route.endswith("/__dscc/ping"):
-            return self._json({"ok": True, "at": time.time()})
+        if "/__dscc/" in route:
+            if not self._local_request():
+                return self._json({"error": "forbidden"}, 403)
+            if route.endswith("/__dscc/events"):
+                return self._sse()
+            if route.endswith("/__dscc/state"):
+                return self._state()
+            if route.endswith("/__dscc/ping"):
+                return self._json({"ok": True, "at": time.time()})
         return super().do_GET()
 
     def _json(self, obj: dict, code: int = 200) -> None:
@@ -118,7 +140,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -146,7 +167,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "keep-alive")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         try:
             self.wfile.write(b"retry: 1500\n\n")
@@ -221,6 +241,9 @@ def watcher(paths: list[pathlib.Path], builder: pathlib.Path | None,
             t0 = time.time()
             r = subprocess.run([sys.executable, str(builder)], cwd=str(builder.parent),
                                capture_output=True, text=True)
+            # The build rewrites dist/. Re-snapshot so the next poll does not read
+            # our own output as a fresh change and fire a second reload.
+            prev = snapshot(paths)
             if r.returncode == 0:
                 print(f" ok ({time.time() - t0:.1f}s)")
             else:

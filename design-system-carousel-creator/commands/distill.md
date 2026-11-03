@@ -1,6 +1,6 @@
 ---
 description: Turn a brand design system into a locked, machine-checkable token contract.
-argument-hint: <design-system.md|url|paste> [--out design-system.json]
+argument-hint: "<design-system.md|url|paste> [--out build/design-system.json]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 
@@ -44,11 +44,11 @@ Three things that go wrong most often, so check them explicitly:
    it. A library without a recurring graphic reads as fifty unrelated cards no matter how consistent
    the tokens are.
 
-Write `design-system.json` against `${CLAUDE_PLUGIN_ROOT}/schema/design-system.schema.json`, emit
+Write `build/design-system.json` against `${CLAUDE_PLUGIN_ROOT}/schema/design-system.schema.json`, emit
 the matching `:root` CSS blocks in the same pass so the two cannot disagree, then validate:
 
 ```
-python ${CLAUDE_PLUGIN_ROOT}/scripts/dscc.py doctor --system design-system.json
+python ${CLAUDE_PLUGIN_ROOT}/scripts/dscc.py doctor --system build/design-system.json
 ```
 
 Report the `coverage` figure and list every derived value with its rationale. A system at 40%

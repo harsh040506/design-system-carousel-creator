@@ -17,7 +17,7 @@
 
 /* ── SCALES ─────────────────────────────────────────────────────────────────
    Written by distill. Listed here as the required key set — a library missing
-   any of these will fail `dscc lint --undeclared`.
+   any of these will fail the lint check `UNDECLARED_VAR` (P0).
 
    REQUIRED FROM DISTILL
    colour roles : --surface --surface-2 --surface-3 --ink --muted --faint
@@ -29,6 +29,11 @@
    figure ramp  : --f-hero --f-lg --f-md --f-sm --f-xs
    weights      : --w-display --w-body --w-med --w-bold
    texture      : --grain (data-URI feTurbulence)
+
+   OPTIONAL (the kernel falls back when absent; distill should still set them)
+   motif        : --motif-fill (falls back to --accent) --motif-radius (50%)
+   on-photo     : --on-photo-fg --on-photo-mute --on-photo-soft
+                  --on-photo-rule --on-photo-well (white at falling opacities)
    ───────────────────────────────────────────────────────────────────────── */
 
 :root{
@@ -36,11 +41,11 @@
      Seven steps is enough for any card. An eighth is a symptom. */
   --s0:4px; --s1:8px; --s2:16px; --s3:20px; --s4:24px; --s5:32px; --s6:40px;
 
-  /* Radii — three roles, no others */
+  /* Radii — four roles, no others */
   --r-pill:9999px; --r-card:20px; --r-tile:20px; --r-icon:17px;
 
   /* Artboard — identical on every card in a library */
-  --card-w:1080px; --card-h:1350px;
+  --card-w:1080px; --card-h:1440px;
   --card-px:68px; --card-pt:64px; --card-pb:56px;
 
   /* Rhythm step — the density auditor's reference unit.
@@ -187,7 +192,7 @@
 
 .motif{position:relative; overflow:hidden; flex:none;
        border-radius:var(--motif-radius, 50%);
-       background:var(--motif-fill)}
+       background:var(--motif-fill, var(--accent))}
 .motif::after{content:''; position:absolute; inset:0;
               background-image:var(--grain); background-size:240px 240px;
               mix-blend-mode:overlay; opacity:.75}
@@ -205,13 +210,13 @@
 
 /* Full-bleed photo cards: one class re-colours every text role at once, so a
    photo card can never be half-legible. */
-.on-photo{color:var(--on-photo-fg)}
-.on-photo .masthead,.on-photo .heading,.on-photo .display,.on-photo .ink{color:var(--on-photo-fg)}
-.on-photo .kicker,.on-photo .caption,.on-photo .masthead .mh-r{color:var(--on-photo-mute)}
-.on-photo .body-sm,.on-photo .body-lg{color:var(--on-photo-soft)}
-.on-photo .foot{border-top-color:var(--on-photo-rule); color:var(--on-photo-mute)}
-.on-photo .tag{background:var(--on-photo-well); color:var(--on-photo-fg)}
-.on-photo .hairline{border-top-color:var(--on-photo-rule)}
+.on-photo{color:var(--on-photo-fg, #FFFFFF)}
+.on-photo .masthead,.on-photo .heading,.on-photo .display,.on-photo .ink{color:var(--on-photo-fg, #FFFFFF)}
+.on-photo .kicker,.on-photo .caption,.on-photo .masthead .mh-r{color:var(--on-photo-mute, rgba(255,255,255,.72))}
+.on-photo .body-sm,.on-photo .body-lg{color:var(--on-photo-soft, rgba(255,255,255,.86))}
+.on-photo .foot{border-top-color:var(--on-photo-rule, rgba(255,255,255,.32)); color:var(--on-photo-mute, rgba(255,255,255,.72))}
+.on-photo .tag{background:var(--on-photo-well, rgba(255,255,255,.16)); color:var(--on-photo-fg, #FFFFFF)}
+.on-photo .hairline{border-top-color:var(--on-photo-rule, rgba(255,255,255,.32))}
 
 /* ═══ DATA ══════════════════════════════════════════════════════════════════ */
 
@@ -232,9 +237,10 @@
    carries few rows, where distributing would blow the gaps apart.
 
    The opt-out is a LICENSE, not a preference. It must be declared in the
-   manifest as intent:"breathe" with a reason the auditor recognises. An
-   undeclared `-top` is a defect; so is a distributed card whose gaps exceed
-   1.5x --rhythm, because that is the same slack wearing a disguise.
+   plan as intent:"breathe" with a license the auditor recognises. Slack over
+   160px without one is a defect (UNLICENSED_SLACK); so is a distributed card
+   whose gaps exceed 1.5x --rhythm, because that is the same slack wearing a
+   disguise.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* — stack: ruled rows, the workhorse — */
@@ -327,7 +333,7 @@
      broken this exact layout before. — */
 .media-row{flex:0 0 auto; display:flex; gap:var(--s5); align-items:flex-start}
 .media-row .pane{flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--s3)}
-.media-row img-slot{flex:0 0 400px}
+.media-row image-slot{flex:0 0 400px}
 
 /* — note: a closing line pinned to the bottom rule.
      Concluding asides belong at the bottom of the card, always. Floating one

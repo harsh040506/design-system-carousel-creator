@@ -48,6 +48,7 @@ needs them named for what they *do*. Map every brand colour onto exactly one rol
 | `--on-ink` | text sitting on `--ink` |
 | `--rule` | hairlines and borders |
 | `--accent` / `--accent-2` | brand colour, used per the legality rules below |
+| `--on-photo-fg` `-mute` `-soft` `-rule` `-well` | text roles over full-bleed photos; put them in `constant` (the kernel falls back to white at falling opacities) |
 
 Then produce the **inverse plate** set (`--plate-bg`, `--plate-fg`, `--plate-mute`, `--plate-rule`,
 `--plate-well`). Most brand documents don't specify one. Derive it: the plate background is the
@@ -88,18 +89,19 @@ Also fix the five-step **figure ramp** (`hero · lg · md · sm · xs`). Numbers
 their own ramp: larger, tighter tracking, lighter weight than headings at the same optical size.
 
 **Font substitution.** Proprietary brand faces usually aren't available. Substitute by *skeleton*,
-not by vibe — match x-height, contrast and terminal style. Record the substitution explicitly in
-`typography[].note` so nobody later mistakes it for the real specification.
+not by vibe — match x-height, contrast and terminal style. Record the substitution explicitly
+in `substitutions[]` as `{specified, used, why}` so nobody later mistakes it for the real
+specification.
 
 ### 3 · Spacing → seven values
 
 `4 · 8 · 16 · 20 · 24 · 32 · 40`. A 4px half-step on an 8px base. Seven steps is enough for any
 card; an eighth is a symptom that a layout is fighting the system.
 
-Also fix `--rhythm` — the reference unit for the density auditor's gap ceiling. 64px suits a
-1080×1350 artboard.
+Also set `canvas.rhythm` — the reference unit for the density auditor's gap ceiling, which is 1.5×
+it. 64px suits a 1080-wide artboard.
 
-### 4 · Radii → three roles
+### 4 · Radii → four roles
 
 `pill` (9999px, for tags and chips), `card` (panels), `tile` (smaller fills), `icon` (squircle-ish
 icon tiles). If the brand specifies a minimum radius, respect it as a floor everywhere.
@@ -113,7 +115,8 @@ Find it in the brand material: a gradient sphere, a notch, a logo lockup, a spec
 a mark. If the brand has no obvious motif, derive one from the accent colour and the brand's stated
 character, and say plainly in the output that it was derived.
 
-Record: what it is, the exact CSS that draws it, roughly what fraction of cards should carry it
+Write its fill as `--motif-fill` in both theme maps and its radius as `--motif-radius` (the kernel
+falls back to `--accent` and 50%). Record: what it is, the exact CSS that draws it, roughly what fraction of cards should carry it
 (⅓ is a good default), and where it must never appear.
 
 **Always add grain.** A flat CSS gradient reads as a default; the same gradient under an
@@ -140,8 +143,9 @@ These go straight into the compositor's prompt as hard constraints.
 
 ## Handling thin input
 
-Users often paste half a system. Fill gaps by derivation, never by silence, and **mark every derived
-value** with `"derived": true` plus a one-line rationale.
+Users often paste half a system. Fill gaps by derivation, never by silence, and **record every derived
+value** as a `rules[]` entry with `"source": "derived"` and a one-line rationale; set
+`motif.derived: true` for an invented motif. Token values themselves stay plain strings.
 
 | Missing | Derivation |
 |---|---|

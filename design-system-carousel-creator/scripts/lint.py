@@ -31,12 +31,28 @@ TAG_RE = re.compile(r"<(/?)([a-zA-Z][\w:-]*)((?:\"[^\"]*\"|'[^']*'|[^>\"'])*?)(/
 STYLE_ATTR_RE = re.compile(r'style\s*=\s*"([^"]*)"|style\s*=\s*\'([^\']*)\'', re.I)
 VAR_DECL_RE = re.compile(r"(--[A-Za-z0-9_-]+)\s*:")
 VAR_USE_RE = re.compile(r"var\(\s*(--[A-Za-z0-9_-]+)")
+# A use with no fallback: `var(--x)`. `var(--x, 50%)` resolves without a declaration.
+VAR_BARE_RE = re.compile(r"var\(\s*(--[A-Za-z0-9_-]+)\s*\)")
+# applyTheme() writes properties with setProperty('--x', ...); those are declared too.
+VAR_SET_RE = re.compile(r"setProperty\(\s*['\"](--[A-Za-z0-9_-]+)['\"]")
 HEX_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 PX_RE = re.compile(r"(?<![\w-])(\d+(?:\.\d+)?)px")
 
 # Values that are legitimately raw even inside card markup: hairline widths and
 # zero. Everything else must resolve through a token.
 PX_ALLOW = {"0", "1", "2"}
+
+
+def _px_allowed(px: str) -> bool:
+    """True for the hairline values (0/1/2px), however they are spelled.
+
+    Compared numerically: stripping trailing "0"/"." characters instead would
+    turn 10, 20, 100 and 1000 into 1 and 2 and wave them through.
+    """
+    try:
+        return f"{float(px):g}" in PX_ALLOW
+    except ValueError:
+        return False
 
 WEB_CHROME_TAGS = ["button", "nav", "form", "input", "select", "textarea",
                    "menu", "dialog", "fieldset"]
@@ -79,7 +95,7 @@ CROSS_REF_RE = re.compile("|".join(CROSS_REF_PHRASES), re.I)
 ATTRIBUTION_PATTERNS = [
     r"\bedited by\b", r"\bwritten by\b", r"\bfrom the book\b", r"\bexcerpt(?:ed)? from\b",
     r"\bsource:\s*\S", r"\bchapter\s+(?:\d+|one|two|three|four|five|six|seven)\b",
-    r"\bpublished by\b", r"\b©\s*\d{4}\b", r"\bISBN\b", r"\bpp?\.\s*\d+\b",
+    r"\bpublished by\b", r"©\s*\d{4}\b", r"\b\d{4}\s*©", r"\(c\)\s*\d{4}\b", r"\bISBN\b", r"\bpp?\.\s*\d+\b",
     r"\bet al\.", r"\bibid\b", r"\bforeword by\b", r"\bafterword by\b",
 ]
 ATTRIBUTION_RE = re.compile("|".join(ATTRIBUTION_PATTERNS), re.I)
@@ -298,9 +314,9 @@ def lint(path: pathlib.Path, system: dict | None = None,
     defects += check_balance(html)
 
     # ---- custom properties -------------------------------------------------
-    declared = set(VAR_DECL_RE.findall(html))
+    declared = set(VAR_DECL_RE.findall(html)) | set(VAR_SET_RE.findall(html))
     used = set(VAR_USE_RE.findall(html))
-    for v in sorted(used - declared):
+    for v in sorted(set(VAR_BARE_RE.findall(html)) - declared):
         defects.append({"code": "UNDECLARED_VAR", "severity": "P0", "detail": v})
     unused = sorted(declared - used)
 
@@ -314,7 +330,7 @@ def lint(path: pathlib.Path, system: dict | None = None,
         for m in STYLE_ATTR_RE.finditer(inner):
             decl = m.group(1) or m.group(2) or ""
             for px in PX_RE.findall(decl):
-                if px.rstrip(".0") not in PX_ALLOW and px not in PX_ALLOW:
+                if not _px_allowed(px):
                     cd.append({"code": "RAW_PX", "severity": "P1", "card": i,
                                "detail": f"{px}px in inline style"})
             if re.search(r"font-size", decl, re.I):
@@ -367,7 +383,7 @@ def lint(path: pathlib.Path, system: dict | None = None,
         # only inspect declarations that are not inside :root
         css_body = re.sub(r":root[^{]*\{[^}]*\}", "", css, flags=re.S)
         off = sorted({p for p in PX_RE.findall(css_body)
-                      if p not in legal_px and p not in PX_ALLOW})
+                      if p not in legal_px and not _px_allowed(p)})
         for p in off[:25]:
             defects.append({"code": "OFF_SCALE", "severity": "P2",
                             "detail": f"{p}px is not on any declared scale"})

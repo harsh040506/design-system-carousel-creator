@@ -1,6 +1,6 @@
 ---
 description: Measure, score and gate a template library against the quality rubric.
-argument-hint: [library.html] [--critic] [--strict] [--note "…"]
+argument-hint: "[library.html] [--critic] [--strict] [--note \"…\"]"
 allowed-tools: Read, Write, Bash, Glob, Skill, Agent
 ---
 
@@ -23,10 +23,11 @@ prints what it wired so you can see it was right. Passing five paths by hand on 
 five chances to audit a library against the wrong brief. Explicit flags still win when you need them.
 
 This produces `audit/lint.json`, `measure.json`, `uniq.json` and `scorecard.json`, plus per-card
-PNGs, and appends one line to `audit/history.jsonl`. It covers 80 of the 100 points.
+PNGs, and appends one line to `audit/history.jsonl`. It covers the 80 deterministic points (70 if the project has no content brief, since Veracity
+needs one).
 
 `--strict` promotes every accepted-but-unresolved P2 into a gate failure. Use it when you intend to
-actually close `GAP_VARIANCE` rather than note it for a third run.
+actually close `GAP_VARIANCE` rather than note it for a third run. An unscored Craft (no `critic.json`) also fails the gate under `--strict`.
 
 ## Constraints
 
@@ -57,9 +58,10 @@ python ${CLAUDE_PLUGIN_ROOT}/scripts/score.py --lint audit/lint.json \
   --critic audit/critic.json --brief build/content-brief.json --out audit/scorecard.json
 ```
 
-Without it the library is scored out of 80, Craft reads `--`, and the scorecard carries a `NO_CRITIC`
-defect saying so. **Repeat that in your report.** Presenting an 80-point score as a 100-point one is
-the specific dishonesty this pipeline's whole benchmark section exists to prevent.
+Without it the total is scaled up from the deterministic points that could be scored (80 with a content brief, 70 without), Craft reads `--`, and the
+scorecard carries a `NO_CRITIC` defect saying so. **Repeat that in your report.** Presenting a
+scaled score as a full 100-point one is the specific dishonesty this pipeline's whole benchmark
+section exists to prevent.
 
 ## Reading the result
 

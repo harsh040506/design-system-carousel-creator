@@ -113,9 +113,9 @@ foreword by · afterword by
 ### It checks the chrome too
 
 This is the part people miss. The scan covers the cards **and** everything around them: the
-gallery header, the eyebrow, the `<title>` element, the format labels, and `alt` text. Those
-are exactly where a removed title reappears — you clear all fifty cards and the document title
-still says it.
+gallery header, the eyebrow, the `<title>` element and the format labels. Those are exactly
+where a removed title reappears — you clear all fifty cards and the document title still says
+it. Attribute values such as `alt` and `placeholder` are not scanned; keep them clean by hand.
 
 ### A consequence worth stating up front
 

@@ -70,7 +70,7 @@
   },
 
   "media": {
-    "cards_with_slots": [16, 20],
+    "cards_with_slots": [14, 20],
     "prefill": true,
     "treatment": "grayscale-or-duotone",
     "placeholder_style": "describe the intended subject, never the word 'Image'",
@@ -93,10 +93,10 @@
 
   "typography": {
     "registers_per_card": 3,
-    "display_min_px": 46,
-    "display_typical_px": [62, 104],
+    "display_min_px": 120,
+    "headline_min_px": 52,
     "micro_px": [13, 19],
-    "rationale": "Three registers max: display, body, micro. The micro register (corner labels, index numbers, credits, bracketed asides) is where density comes from without loudness. Display floor of 46px is set by thumbnail legibility at 3.6x reduction."
+    "rationale": "Three registers max: display, body, micro. The micro register (corner labels, index numbers, credits, bracketed asides) is where density comes from without loudness. The 120px display floor and 52px headline floor are what dscc doctor enforces; both come from thumbnail legibility at 3.6x reduction."
   },
 
   "taxonomy": {
@@ -137,7 +137,7 @@
 
   "output": {
     "format": "dc.html",
-    "bundle_files": ["support.js", "image-slot.js", "canvas.html", ".image-slots.state.json"],
+    "bundle_files": ["support.js", "image-slot.js", "vendor/", "canvas.html", ".image-slots.state.json"],
     "runtime_is_mandatory": true,
     "source_of_truth": "build/build.py",
     "rationale": "Every built library is a self-contained bundle and scripts/scaffold.py installs and verifies all of it on every build, so this is mechanical rather than remembered. The .dc.html is an OUTPUT: the generator beside it is the source. A 121 KB hand-edited HTML file with no source cannot be re-typed, re-themed or re-ordered; the same file with a 400-line builder is an asset."

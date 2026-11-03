@@ -37,7 +37,7 @@ import project as proj      # noqa: E402
 import score as score_mod   # noqa: E402
 
 THUMB_LIMIT = 60
-THUMB_BYTES = 220_000       # per image, before we skip it
+THUMB_BYTES = 800_000       # per image, before we skip it (a 1080x1440 PNG is often 300-600 KB)
 
 
 def esc(s) -> str:
@@ -144,8 +144,11 @@ def build(pd: pathlib.Path) -> pathlib.Path:
     out_of = sc.get("scored_out_of", 100)
     add('<div class="hero">')
     add(f'<div class="total mono">{sc.get("total")}</div>')
-    add(f'<div class="note">out of {out_of}'
-        + (f' — {", ".join(unscored)} not scored' if unscored else "") + "</div>")
+    if unscored:
+        add(f'<div class="note">scaled to 100 from {esc(sc.get("raw_points", "?"))} of '
+            f'{out_of} scoreable points — {esc(", ".join(unscored))} not scored</div>')
+    else:
+        add(f'<div class="note">out of {out_of}</div>')
     add(f'<div style="flex:1"></div><div class="gate {esc(sc.get("gate"))}">'
         f'{esc(sc.get("gate"))}</div></div>')
 
@@ -220,11 +223,15 @@ def build(pd: pathlib.Path) -> pathlib.Path:
     pngs = sorted(shots.glob("*.png"))[:THUMB_LIMIT] if shots.is_dir() else []
     if pngs:
         by_idx = {r["index"]: r for r in sc.get("cards", [])}
-        add(f"<h2>Renders — {len(pngs)} cards</h2><div class='grid'>")
-        for i, p in enumerate(pngs, 1):
-            uri = data_uri(p)
-            if not uri:
-                continue
+        thumbs = [(i, data_uri(p)) for i, p in enumerate(pngs, 1)]
+        shown = [(i, uri) for i, uri in thumbs if uri]
+        skipped = len(thumbs) - len(shown)
+        add(f"<h2>Renders — {len(shown)} cards</h2>")
+        if skipped:
+            add(f'<p class="note">{skipped} render(s) over {THUMB_BYTES // 1000} KB not embedded; '
+                f'see shots/</p>')
+        add("<div class='grid'>")
+        for i, uri in shown:
             row = by_idx.get(i)
             bad = row and any(d["severity"] == "P0" for d in row.get("defects", []))
             add(f'<div class="card{" fail" if bad else ""}"><img src="{uri}" alt="card {i}">'

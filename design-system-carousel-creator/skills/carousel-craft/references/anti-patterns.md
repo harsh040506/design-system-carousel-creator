@@ -40,8 +40,8 @@ nesting inside each other.
 
 **Cause.** One missing `</div>` somewhere in three thousand lines.
 
-**Fix.** `dscc lint --balance` counts opening and closing tags per card region. Run it after every
-build. Do not attempt to find this by reading.
+**Fix.** `python scripts/lint.py <library>.dc.html` (also run by `dscc audit`) counts opening and closing
+tags per card region and reports `UNBALANCED` with a line number. Run it after every build. Do not attempt to find this by reading.
 
 ---
 
@@ -79,7 +79,7 @@ that are interchangeable.
 and you never see the set.
 
 **Fix.** Plan all fifty tuples in a table before building. Check collisions mechanically
-(`dscc uniq`). Resolve by changing enumerator, chrome, emphasis, or partition — in that order of
+(`python scripts/uniq.py build/layout-plan.json`). Resolve by changing enumerator, chrome, emphasis, or partition — in that order of
 cost. Changing the words is not a resolution.
 
 ### Scale drift
@@ -168,13 +168,14 @@ figure/ground changes — when everything is a box, nothing has weight.
 
 **Fix.** `feTurbulence` noise as a data-URI, `mix-blend-mode:overlay`, ~0.75 opacity. Two lines.
 
-### Plate cards clustered
+### Loud grounds clustered
 
-**Tell.** Cards 26–30 are all inverted; the rest of the library is uniformly light.
+**Tell.** Cards 26–30 are all `ink`; the rest of the library is uniformly light. `uniq.py` reports
+it as `GROUND_CLUSTER`.
 
 **Cause.** Assigning chrome by category rather than by rhythm.
 
-**Fix.** Distribute plate cards every 4–6 slides across the whole sequence. They are punctuation;
+**Fix.** Distribute `ink` and accent grounds every 4–6 slides across the whole sequence. They are punctuation;
 punctuation doesn't cluster.
 
 ### Concluding line floating mid-card

@@ -34,16 +34,17 @@ all monoliths.
 | Property | Target |
 |---|---|
 | cards with a large image slot | 14–20 |
-| plate (inverted) cards | 8–12 |
-| tinted cards | 4–6 |
-| full-bleed photo cards | 2–4 |
+| named grounds used | ≥5 of paper · panel · ink · accent-1 · accent-2 · grey |
+| ground mix (per 50 cards) | paper 20–26 · panel 6–9 · ink 6–9 · accent-1 4–6 · accent-2 2–4 · grey 3–5 |
+| full-bleed photo cards (`flush`) | 2–4 — not a ground; does not count toward the five |
 | figure-emphasis cards | 8–12 |
 | distinct partitions used | ≥8 of 10 |
 | most-used partition | ≤9 cards |
 | mean pairwise tuple distance | ≥2.6 |
 
-Distribute plate cards **every 4–6 slides across the sequence**, not clustered in one section. They
-are punctuation; punctuation does not cluster.
+Distribute the loud grounds (`ink`, `accent-1`, `accent-2`) **every 4–6 slides across the
+sequence**, never the same loud ground on two adjacent cards (`GROUND_CLUSTER`). They are
+punctuation; punctuation does not cluster.
 
 ## Declare intent honestly
 
@@ -56,10 +57,11 @@ decision instead of an accident.
 ## Check the set, then fix the set
 
 ```
-python <plugin-root>/scripts/uniq.py layout-plan.json --out uniq.json
+python <plugin-root>/scripts/uniq.py build/layout-plan.json --out uniq.json
 ```
 
-Resolve every `DUP_LAYOUT`, `LOW_VARIETY` and `MIX_OFF` before returning. Resolution order, cheapest
+Resolve every `DUP_LAYOUT`, `LOW_VARIETY`, `FLAT_SURFACES`, `GROUND_CLUSTER`, `NARROW_RANGE`,
+`OVERUSED`, `MIX_OFF`, `BAD_AXIS` and `DUP_NAME` before returning. Resolution order, cheapest
 first: **enumerator → chrome → emphasis → partition.** Changing the enumerator costs nothing and
 reads as a genuinely different card; changing the partition is expensive and should only happen when
 the content actually wants it.

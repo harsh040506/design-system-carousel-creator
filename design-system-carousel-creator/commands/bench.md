@@ -1,6 +1,6 @@
 ---
 description: Optionally compare a library against any comparison libraries you supply, using the identical auditor.
-argument-hint: <candidate.html> <comparison.html...>
+argument-hint: "<candidate.html> <comparison.html...>"
 allowed-tools: Read, Bash, Glob, Skill
 ---
 

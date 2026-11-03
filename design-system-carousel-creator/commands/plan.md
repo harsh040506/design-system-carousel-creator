@@ -1,6 +1,6 @@
 ---
 description: Plan all layouts as a set, with collision checking, before building any card.
-argument-hint: [--cards 50] [--brief content-brief.json] [--out layout-plan.json]
+argument-hint: "[--cards 50] [--brief build/content-brief.json] [--out build/layout-plan.json]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 
@@ -34,13 +34,13 @@ because a license that can be claimed freely stops meaning anything.
 ## Check the set
 
 ```
-python ${CLAUDE_PLUGIN_ROOT}/scripts/uniq.py layout-plan.json --out uniq.json
+python ${CLAUDE_PLUGIN_ROOT}/scripts/uniq.py build/layout-plan.json --out uniq.json
 ```
 
 Resolve every collision **in the plan**. Cheapest first: enumerator → chrome → emphasis → partition.
 Changing the words is not a resolution; the auditor compares tuples and so does the reader's eye.
 
-Also clear `MIX_OFF` here. Hitting the media/plate/tinted targets after the cards exist means
-rebuilding them.
+Also clear `MIX_OFF` here. Hitting the media, figure and ground-mix targets after the cards exist
+means rebuilding them.
 
 Report the distribution table and the mean pairwise distance before moving on.

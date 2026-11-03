@@ -7,7 +7,7 @@ A complete guide to the Design System Carousel Creator, in reading order.
 | 1 | [**Getting started**](01-getting-started.md) | Install, check the toolchain, build your first library in about ten minutes |
 | 2 | [**Concepts**](02-concepts.md) | Projects, the six-dimension score, mechanic tuples, the density law, named surfaces. Read this once and the rest of the tool explains itself |
 | 3 | [**The pipeline**](03-pipeline.md) | Every stage from brand document to shipped bundle, what each one writes, and when to re-run it |
-| 4 | [**Command reference**](04-commands.md) | All twelve slash commands, every flag |
+| 4 | [**Command reference**](04-commands.md) | All twelve slash commands and their main flags (full flag tables in the CLI reference) |
 | 5 | [**CLI reference**](05-cli.md) | The Python scripts, usable without Claude at all — in CI, in a Makefile, on someone else's library |
 | 6 | [**The canvas**](06-canvas.md) | Pan, zoom, dark mode, card index, audit overlay, live reload, presenter mode |
 | 7 | [**Constraints**](07-constraints.md) | Turning "each card must stand alone" and "don't mention the source" into checks that run every time |
@@ -15,6 +15,7 @@ A complete guide to the Design System Carousel Creator, in reading order.
 | 9 | [**Defect reference**](09-defects.md) | Every code the auditor emits, what causes it, and the one legal fix |
 | 10 | [**Troubleshooting**](10-troubleshooting.md) | Symptoms, causes, fixes — including the ones that look like bugs and aren't |
 | 11 | [**Extending**](11-extending.md) | New mechanics, new checks, new artboard sizes, adapting the plugin to your own house style |
+| — | [**Changelog**](../CHANGELOG.md) | What changed in each version, and which changes make scores incomparable |
 
 ## The short version
 

@@ -37,8 +37,8 @@ half's job:
 - **20 points are judged** by a critic agent working from an anchored rubric with worked
   examples, scoring rendered PNGs — never source code.
 
-A library ships at **≥80 total, ≥70 per card, zero P0 defects, and every declared constraint
-clean.** Below that, `:refine` loops.
+A library ships at **≥80 total, ≥70 per card, zero P0 defects, Density ≥15/20, Distinction
+≥11/15, and every declared constraint clean.** Below that, `:refine` loops.
 
 The thresholds are fixed constants in `scripts/score.py`, calibrated once and locked. **No
 reference library is required.** Every gate check, scale floor and density ceiling works
@@ -63,7 +63,8 @@ Acme Templates/
 └── RELEASE.md
 ```
 
-`dist/` reaches outside itself for nothing. `inputs/` is frozen at creation rather than copied
+`dist/` is self-contained: React ships in `dist/vendor/`, the canvas embeds its own UI font, and the only
+optional outside request is the webfont stylesheet (`scaffold.py init --fonts none` removes it, and rebuilds keep that). `inputs/` is frozen at creation rather than copied
 at ship time — a step you have to remember is a step that eventually doesn't happen, and six
 months later nobody knows which brief produced which slides.
 
@@ -80,7 +81,7 @@ months later nobody knows which brief produced which slides.
 | **Zero-argument audit** | Inside a project it reads its own wiring. Five manual paths is five chances to audit against the wrong brief |
 | **Theme safety** | A colour used on a card but absent from both theme maps is provably wrong in one theme — a static check, not a judgement call |
 | **Audit history** | `audit/history.jsonl`, append-only. The refine trail is a file, not a memory |
-| **Nothing phones out** | Building, auditing and previewing all work offline. The canvas embeds its own UI font rather than fetching one |
+| **Works offline** | Building, auditing, previewing and rendering the library all work with no network. React is vendored into `dist/vendor/` and the canvas embeds its own UI font. The one optional request is the brand webfont stylesheet, which falls back to a system font when blocked; pass `--fonts none` with `--fonts-dir` for a bundle that makes none |
 
 ---
 
@@ -114,7 +115,7 @@ months later nobody knows which brief produced which slides.
                :ship  ──►  :preview
 ```
 
-`:run` executes all of it. The stages are separately invocable because in practice you re-run
+`:run` executes every stage except `:ship`. The stages are separately invocable because in practice you re-run
 `plan → build → audit` a dozen times and `distill` once.
 
 ---
@@ -136,8 +137,8 @@ anti-instructions.
 ## Install
 
 ```
-/plugin marketplace add <this-directory>
-/plugin install design-system-carousel-creator
+/plugin marketplace add <path-to-this-repository>
+/plugin install design-system-carousel-creator@design-system-carousel-creator
 ```
 
 Or point Claude Code at the folder directly — the plugin is self-contained.
@@ -148,7 +149,8 @@ Or point Claude Code at the folder directly — the plugin is self-contained.
 pip install playwright && playwright install chromium
 ```
 
-Python ≥ 3.10. No Node. No network at runtime.
+Python ≥ 3.10 and Playwright with Chromium. No Node. No network needed to build, audit, preview or render (a webfont stylesheet is
+requested only if you leave the default `--fonts` in place).
 
 ---
 
@@ -167,7 +169,7 @@ explicitly disallowed as a fix. This single constraint is the largest reason the
 produces different work than a one-shot generation would.
 
 The licensed exception: a card may declare `intent: "breathe"` — legal for covers, closers,
-single-figure statements, media-led cards and cards with ≤4 rows. Unlicensed slack is a defect;
+single-figure statements, media-led cards, section breaks and cards with ≤4 rows. Unlicensed slack is a defect;
 licensed slack is a design decision.
 
 ### Uniqueness, defined
@@ -180,7 +182,7 @@ Two slides are the same slide if their **mechanic tuple** matches:
 
 The collision check is exact, and `uniq.py` also reports mean pairwise Hamming distance — a
 library where every pair differs on one axis is technically legal and still feels repetitive.
-The gate requires ≥ 2.6. "Fifty unique layouts" stops being an aspiration.
+Below 2.6 the auditor raises `LOW_VARIETY` (P1) and Distinction loses points. "Fifty unique layouts" stops being an aspiration.
 
 ---
 
@@ -198,9 +200,9 @@ The gate requires ≥ 2.6. "Fifty unique layouts" stops being an aspiration.
 Full anchors live in [`schema/rubric.json`](schema/rubric.json). The critic must cite a card
 index and a visible reason for every deduction; unanchored deductions are discarded on merge.
 
-**If Craft is unscored the total is out of 80, and the scorecard says so in its own defect list.**
-Presenting an 80-point total as a 100-point one is the exact dishonesty the benchmark caveats
-exist to prevent.
+**If Craft is unscored the total is scaled from the deterministic points that could be scored (80 with a content brief, 70 without), and the scorecard says
+so in its own defect list.** Presenting that scaled total as a full 100-point one is the exact
+dishonesty the benchmark caveats exist to prevent.
 
 ---
 
@@ -221,12 +223,12 @@ design-system-carousel-creator/
 │   ├── design-system-distillation/
 │   └── quality-gate/
 ├── scripts/
-│   ├── dscc.py       CLI: new · list · info · doctor · build · audit · preview · report · bench
-│   ├── project.py    project isolation: new · adopt · info · history
+│   ├── dscc.py       CLI: new · list · info · adopt · set · doctor · build · audit · preview · serve · report · slots · bench · shots
+│   ├── project.py    project isolation: new · adopt · list · info · set
 │   ├── scaffold.py   .dc.html envelope + runtime + canvas + emitted builder
 │   ├── serve.py      preview server: free port, SSE live reload
 │   ├── report.py     the project as one self-contained HTML page
-│   ├── slots.py      image slots: list · fill · state · audit
+│   ├── slots.py      image slots: list · fill · state · audit · clear
 │   ├── lint.py       static analysis + declared-constraint enforcement
 │   ├── measure.py    Playwright geometry harness
 │   ├── uniq.py       mechanic-tuple collision + distance
@@ -257,7 +259,16 @@ other, which is the main reason the split exists.
 
 ---
 
+## Versioning
+
+The version lives in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) and
+`python scripts/dscc.py --version` prints it. Every scorecard and every `audit/history.jsonl` row
+records it as `scorer_version`, because totals produced under different scoring rules are not
+comparable. Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Licence
 
 MIT. The bundled JetBrains Mono subset is SIL OFL 1.1 — see
-[`assets/canvas/FONT-LICENSE.md`](assets/canvas/FONT-LICENSE.md).
+[`assets/canvas/FONT-LICENSE.md`](assets/canvas/FONT-LICENSE.md). The vendored
+React 18.3.1 build is MIT — see
+[`assets/runtime/vendor/LICENSE-react.txt`](assets/runtime/vendor/LICENSE-react.txt).

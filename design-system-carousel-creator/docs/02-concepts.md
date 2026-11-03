@@ -80,14 +80,14 @@ Two slides are the same slide if their **mechanic tuple** matches:
 | **enumerator** | what marks the items — `none · number · pip · rule · chip · icon · glyph` |
 | **emphasis** | what carries the weight — `display · figure · media · quote · panel · diagram` |
 | **media** | `none · inset · sidecar · full-bleed · repeated` |
-| **chrome** | `standard · plate · tinted · flush` |
+| **chrome** | the surface ground — `paper · panel · ink · accent-1 · accent-2 · grey · flush` (the legacy `standard · plate · tinted` are read as `paper · ink · panel`) |
 
 Those cardinalities give far more than fifty combinations, so uniqueness is achievable without
 contortion. The collision check is exact.
 
 But exactness alone is not enough: a library where every pair differs on exactly one axis is
 technically legal and still feels repetitive. So the auditor also reports **mean pairwise
-Hamming distance**, and the gate requires ≥ 2.6. "Fifty unique layouts" stops being an
+Hamming distance**; below 2.6 it raises `LOW_VARIETY` and Distinction loses points. "Fifty unique layouts" stops being an
 aspiration and becomes a number.
 
 ---

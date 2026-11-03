@@ -41,14 +41,14 @@ way a good design system produces bad social content.
 **2. One idea per slide, stated at poster scale.**
 If you cannot name the slide's single claim in six words, the slide is two slides. Body copy under
 ~24px on a 1080-wide artboard is a report; the headline should be legible at thumbnail size, which
-in practice means ≥46px for anything carrying the idea.
+in practice means ≥52px (the `--t-heading` floor) for anything carrying the idea.
 
 **3. Sparse means under-written, never over-spaced.**
 See `references/density-law.md`. This is the law that gets violated most and costs most.
 
 **4. Fifty compositions, one identity.**
 Every card shares the same artboard, the same masthead position, the same footer, the same type
-ramp, the same nine spacing values. Everything *between* the masthead and the footer should be
+ramp, the same seven spacing values. Everything *between* the masthead and the footer should be
 different on every card. Libraries fail in both directions: fifty identical cards (boring) or fifty
 unrelated cards (not a library).
 
@@ -59,7 +59,7 @@ Follow this order. Each stage is cheap to redo and expensive to skip.
 ### 1 · Lock the system before drawing anything
 
 Convert the brand input into a **closed set** of legal values — see the
-`design-system-distillation` skill. Nine type steps, five figure steps, seven spacing values, three
+`design-system-distillation` skill. Nine type steps, five figure steps, seven spacing values, four
 radii, one motif. Not "roughly these"; exactly these. Then never write a raw pixel or hex value in
 card markup again.
 
@@ -70,7 +70,8 @@ numbers, and that "is this consistent?" becomes a grep instead of a squint.
 
 Slides written from memory of the source material drift into generic SaaS filler within about eight
 cards. Extract atomic claims first — each a single assertion with its source span and a type
-(`stat`, `definition`, `contrast`, `quote`, `process`, `milestone`, `objection`, `consequence`).
+(`stat`, `definition`, `contrast`, `quote`, `process`, `milestone`, `objection`, `consequence`,
+`example`, `principle`).
 Then compose slides *from the inventory*.
 
 Two things fall out for free: you can prove no number was invented, and when a card turns out
@@ -88,9 +89,9 @@ Target distribution over fifty cards, which is what keeps a library from feeling
 | Property | Target |
 |---|---|
 | cards carrying a large image slot | 14–20 (≈30–40%) |
-| inverted / plate cards | 8–12 |
-| tinted-surface cards | 4–6 |
-| full-bleed photo cards | 2–4 |
+| named grounds used | ≥5 of paper · panel · ink · accent-1 · accent-2 · grey |
+| ground mix (per 50 cards) | paper 20–26 · panel 6–9 · ink 6–9 · accent-1 4–6 · accent-2 2–4 · grey 3–5 |
+| full-bleed photo cards (`flush`) | 2–4 — not a ground; does not count toward the five |
 | cards whose emphasis is a figure | 8–12 |
 | distinct partitions used | ≥8 of 10 |
 | most-used partition | ≤9 cards |
@@ -113,7 +114,7 @@ building a sequence, and the kit needs a piece for every position:
 11–15  Tension         what's broken, what it costs. Contrast and negation mechanics.
 16–20  Method          how it works. Numbered, sequential, process mechanics.
 21–25  Proof           data, comparisons, before/after. Ledger and table mechanics.
-26–30  Voice           quotes, testimonials, positions. Plate cards live here.
+26–30  Voice           quotes, testimonials, positions. `ink` and `grey` grounds live here.
 31–35  Depth           technical detail, architecture, specifics. Media-heavy.
 36–40  Objection       what people get wrong, what this is not. Negation.
 41–45  Application     use cases, scenarios, who it's for. Grid mechanics.
@@ -148,8 +149,8 @@ size inside a sentence is a footnote.
 `feTurbulence` noise overlay at ~0.75 opacity in `overlay` blend mode reads as designed. Cheapest
 upgrade available.
 
-**Inverted cards are punctuation.** A plate card every 4–6 slides resets the eye and marks section
-boundaries. Two in a row wastes the effect.
+**Loud grounds are punctuation.** An `ink` or accent card every 4–6 slides resets the eye and marks
+section boundaries. The same loud ground twice in a row wastes the effect (`GROUND_CLUSTER`).
 
 ## Reference files
 
@@ -166,7 +167,7 @@ boundaries. Two in a row wastes the effect.
 
 ## Verification is not optional
 
-A library that has not been through `scripts/dscc.py measure` has not been checked. Eyes miss
+A library that has not been through `scripts/dscc.py audit` has not been checked. Eyes miss
 overflow of 4px, gap variance across cards seen minutes apart, and a type ramp that grew a twelfth
 size. The harness does not. Run it before claiming a card is done — and read
 `quality-gate` for what the numbers mean.

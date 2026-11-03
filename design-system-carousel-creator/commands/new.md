@@ -1,6 +1,6 @@
 ---
 description: Create an isolated project — one folder holding every artifact for one library.
-argument-hint: "<Name>" [--system DESIGN.md] [--source doc.pdf] [--independent] [--no-source]
+argument-hint: "\"<Name>\" [--system DESIGN.md] [--source doc.pdf] [--independent] [--no-source]"
 allowed-tools: Read, Write, Bash, Glob
 ---
 
@@ -70,7 +70,8 @@ library at 2am, skips the manual check, and ships the leak. Set it here and it i
 /design-system-carousel-creator:preview   → serves dist/, opens the canvas
 ```
 
-`dscc.py info` at any point prints what is done, what is next, and the audit trail.
+`dscc.py info` at any point prints the canvas, constraints, which stages are done, and the audit
+trail.
 
 ## An existing working directory
 

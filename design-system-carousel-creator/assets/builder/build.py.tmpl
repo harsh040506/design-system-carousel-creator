@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -48,14 +49,35 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent          # <project>/build
 PROJECT = HERE.parent
-PLUGIN = pathlib.Path(r"__PLUGIN_ROOT__")
+
+
+def find_plugin() -> pathlib.Path:
+    """Locate the plugin without trusting a path baked in at scaffold time.
+
+    A plugin update or move would otherwise leave every existing project pointing
+    at a directory that no longer exists. Order: an explicit override, the
+    variable Claude Code sets for a running plugin, the path recorded when this
+    file was generated (kept as a hint, not an assumption).
+    """
+    candidates = [os.environ.get("DSCC_PLUGIN_ROOT"),
+                  os.environ.get("CLAUDE_PLUGIN_ROOT"),
+                  r"__PLUGIN_ROOT__"]
+    for c in candidates:
+        if c and (pathlib.Path(c) / "scripts" / "scaffold.py").exists():
+            return pathlib.Path(c)
+    sys.exit("cannot find the Design System Carousel Creator plugin.\n"
+             f"  last known location: {candidates[-1]}\n"
+             "  set DSCC_PLUGIN_ROOT to the plugin folder (the one holding scripts/scaffold.py)")
+
+
+PLUGIN = find_plugin()
 SCAFFOLD = PLUGIN / "scripts" / "scaffold.py"
 KERNEL = PLUGIN / "skills" / "carousel-craft" / "assets" / "kernel.css"
 
 SYSTEM_PATH = HERE / "design-system.json"
 PLAN_PATH = HERE / "layout-plan.json"
 BRIEF_PATH = HERE / "content-brief.json"
-DOC = PROJECT / "__LIBRARY_REL__"
+DOC = PROJECT / "__LIBRARY_REL_STR__"
 
 SYSTEM = json.loads(SYSTEM_PATH.read_text(encoding="utf-8")) if SYSTEM_PATH.exists() else {}
 PLAN = json.loads(PLAN_PATH.read_text(encoding="utf-8")) if PLAN_PATH.exists() else {"cards": []}
@@ -65,8 +87,9 @@ CLAIMS = {c["id"]: c for c in BRIEF.get("claims", [])}
 SCAFFOLD_ARGS = [
     str(DOC),
     "--system", str(SYSTEM_PATH),
-    "--title", "__PROJECT_NAME__",
+    "--title", "__PROJECT_NAME_STR__",
     "--cols", "__COLS__",
+    "--fonts", "__FONTS_STR__",
     "--no-builder",
 ]
 
@@ -101,20 +124,53 @@ def card(spec: dict) -> str:
     veracity a lookup instead of a memory.
     """
     idx = spec.get("index", 0)
-    label = f"{idx:02d} · {spec.get('layout', 'card')}"
+    layout = spec.get("layout", "card")
+    label = f"{idx:02d} · {layout}"
     body = compose(spec)                     # <- the interesting half
-    lic = f' data-license="{spec["license"]}"' if spec.get("license") else ""
+    lic = f' data-license="{attr(spec["license"])}"' if spec.get("license") else ""
     return f"""
   <div style="display:flex;flex-direction:column;gap:18px">
-    <div class="gallery-label" style="display:var(--label-vis)">{label}</div>
-    <div class="frame {spec.get('ground', '')}" data-card="{idx:02d}"
-         data-layout="{spec.get('layout', '')}"
-         data-mechanic="{spec.get('mechanic', '')}"
-         data-intent="{spec.get('intent', 'fill')}"{lic}
-         data-claim="{' '.join(spec.get('claims', []))}">
+    <div class="gallery-label" style="display:var(--label-vis)">{esc(label)}</div>
+    <div class="{('frame ' + ground_class(spec)).strip()}" data-card="{idx:02d}"
+         data-layout="{attr(layout)}"
+         data-mechanic="{attr(mechanic_of(spec))}"
+         data-intent="{attr(spec.get('intent', 'fill'))}"{lic}
+         data-claim="{attr(' '.join(spec.get('claims', [])))}">
 {body}
     </div>
   </div>"""
+
+
+AXES = ("partition", "flow", "enumerator", "emphasis", "media", "chrome")
+
+
+def mechanic_of(spec: dict) -> str:
+    """partition:flow:enumerator:emphasis:media:chrome, the string uniq.py reads.
+
+    The plan schema makes `mechanic` optional and requires the six axes, so derive
+    it. Emitting an empty data-mechanic would put the whole library into the
+    uniqueness check's degraded mode, where it can only guess a ground from CSS
+    class names and every collision check is skipped.
+    """
+    if spec.get("mechanic"):
+        return spec["mechanic"]
+    if all(a in spec for a in AXES):
+        return ":".join(str(spec[a]) for a in AXES)
+    return ""
+
+
+def ground_class(spec: dict) -> str:
+    """The surface ground class: g-<chrome>, e.g. g-panel, g-accent-1.
+
+    The plan field is `chrome` (the sixth axis of the mechanic tuple). Ground
+    classes remap the role tokens on .frame, and BRAND_CSS is where they are
+    defined. `paper` is the default ground and needs no class.
+    """
+    g = spec.get("chrome") or spec.get("ground") or ""
+    g = {"standard": "paper", "plate": "ink", "tinted": "panel"}.get(g, g)   # legacy names
+    if g == "flush":
+        return "flush"                     # full-bleed media: the kernel's .frame.flush
+    return "" if g in ("", "paper") else f"g-{g}"
 
 
 def compose(spec: dict) -> str:
@@ -147,9 +203,18 @@ def esc(s: str) -> str:
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
+def attr(s: object) -> str:
+    """Escape for a double-quoted attribute value (same no-numeric-entity rule)."""
+    return esc(str(s)).replace('"', "&quot;")
+
+
 # ── assembly ────────────────────────────────────────────────────────────────
 def inject_tokens(doc: str, tokens: dict[str, str]) -> str:
-    """Add tokens to the existing :root block. Must run BEFORE the CSS insert."""
+    """Add tokens to the existing :root block. Must run BEFORE the CSS insert.
+
+    :root carries the LIGHT defaults (the same map the scaffold seeds it with);
+    applyTheme() overrides every key at runtime for the dark theme.
+    """
     if not tokens:
         return doc
     lines = "".join(f"    {k}: {v};\n" for k, v in tokens.items())
@@ -160,7 +225,24 @@ def insert_css(doc: str) -> str:
     kernel = KERNEL.read_text(encoding="utf-8") if KERNEL.exists() else ""
     if not kernel:
         print("  ! kernel.css not found — the library will have no primitive layer")
-    return doc.replace("</style>", "\n" + kernel + "\n" + BRAND_CSS + "\n</style>", 1)
+    return doc.replace("</style>", "\n" + kernel + "\n" + BRAND_CSS + "\n" + artboard_css() + "\n</style>", 1)
+
+
+def artboard_css() -> str:
+    """The real artboard size, declared AFTER the kernel.
+
+    The kernel ships a default --card-w/--card-h in its own :root. Same selector,
+    later wins, so a project whose canvas is not the kernel's default would
+    otherwise render every frame at the wrong height and be measured against it.
+    """
+    cv = SYSTEM.get("canvas") or {}
+    if not (cv.get("width") and cv.get("height")):
+        try:
+            cv = json.loads((PROJECT / "project.json").read_text(encoding="utf-8")).get("canvas") or {}
+        except (OSError, ValueError):
+            cv = {}
+    w, h = int(cv.get("width") or 1080), int(cv.get("height") or 1440)
+    return f":root{{--card-w:{w}px;--card-h:{h}px}}"
 
 
 def insert_theme(doc: str) -> str:
@@ -169,7 +251,7 @@ def insert_theme(doc: str) -> str:
         return doc
 
     def obj(d: dict[str, str]) -> str:
-        return "{ " + ", ".join(f"'{k.lstrip('-')}': '{v}'" for k, v in d.items()) + " }"
+        return json.dumps({k.lstrip("-"): v for k, v in d.items()}, ensure_ascii=False)
 
     doc = re.sub(r"const v = dark \? \{.*?\} : \{.*?\};",
                  f"const v = dark ? {obj(TOKENS_DARK)} : {obj(TOKENS_LIGHT)};",
@@ -200,7 +282,7 @@ def main() -> None:
     doc = DOC.read_text(encoding="utf-8")
 
     # 2 · tokens into :root, BEFORE the CSS layer. Order is load-bearing.
-    doc = inject_tokens(doc, TOKENS_DARK)
+    doc = inject_tokens(doc, TOKENS_LIGHT)
 
     # 3 · kernel verbatim + the brand layer
     doc = insert_css(doc)
@@ -221,7 +303,7 @@ def main() -> None:
     print(f"built {len(specs)} cards -> {DOC.relative_to(PROJECT)}  ({len(doc) // 1024} KB)")
 
     if a.verify:
-        subprocess.run([sys.executable, str(SCAFFOLD), "verify", str(DOC)])
+        sys.exit(subprocess.run([sys.executable, str(SCAFFOLD), "verify", str(DOC)]).returncode)
 
 
 if __name__ == "__main__":

@@ -368,7 +368,7 @@ __FONT_FACE__
 
   const CARD_W = __CARD_W__, CARD_H = __CARD_H__;
   const DEFAULT_DARK = __DEFAULT_DARK__;
-  const DOC_SRC = "__DOC_SRC__";
+  const DOC_SRC = __DOC_SRC_JS__;
   const STORE_KEY = "dscc.canvas." + DOC_SRC;
 
   const $ = (id) => document.getElementById(id);
@@ -815,7 +815,7 @@ __FONT_FACE__
   function copyShotCmd() {
     const c = cards[current];
     if (!c) return;
-    const cmd = `python dscc.py shots "${DOC_SRC}" shots/  # card ${c.card}: ${c.name}`;
+    const cmd = `python dscc.py shots "${decodeURIComponent(DOC_SRC)}" shots/  # card ${c.card}: ${c.name}`;
     if (navigator.clipboard) navigator.clipboard.writeText(cmd).catch(() => {});
     setStatus("shot command copied", 2600);
   }
@@ -939,7 +939,9 @@ __FONT_FACE__
 
   loadAudit();
   connectLive();
-  if (!localStorage.getItem("dscc.canvas.seen")) {
+  let seen = true;
+  try { seen = !!localStorage.getItem("dscc.canvas.seen"); } catch (e) {}
+  if (!seen) {
     $("keys").classList.add("on");
     try { localStorage.setItem("dscc.canvas.seen", "1"); } catch (e) {}
   }

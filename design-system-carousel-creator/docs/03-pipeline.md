@@ -44,7 +44,7 @@
 Commands are shown short (`:distill`) for readability. The full form is
 `/design-system-carousel-creator:distill`.
 
-`:run` executes all of it. The stages are separately invocable because in practice you re-run
+`:run` executes every stage except `:ship`. The stages are separately invocable because in practice you re-run
 `plan → build → audit` a dozen times and `distill` once.
 
 ---
@@ -106,11 +106,15 @@ fifty cards leaves the refiner with no legal move when a card comes up sparse.
 
 ```json
 {
+  "subject": "…",
+  "sources": [{ "id": "s1", "path": "inputs/book.md" }],
   "claims": [
-    { "id": "c001", "type": "fact", "text": "…", "source": "s1", "span": [1204, 1288] },
-    { "id": "c002", "type": "figure", "text": "…", "figure": "7,500", "source": "s1" }
+    { "id": "c001", "type": "definition", "text": "…", "source": "s1", "span": "L1204-1288" },
+    { "id": "c002", "type": "stat", "text": "…", "figure": "7,500", "source": "s1", "span": "L1301" }
   ],
-  "arc": { "opening": [1, 5], "problem": [6, 14] },
+  "arc": [
+    { "section": "hook", "cards": [1, 2, 3], "claims": ["c001", "c002"] }
+  ],
   "unused_pool": ["c101", "c102"]
 }
 ```
@@ -183,10 +187,10 @@ appends one line to `audit/history.jsonl`.
 **Writes:** `audit/{lint,measure,uniq,scorecard}.json`, `shots/*.png`, `audit/history.jsonl`
 
 For the judged twenty points, run the `design-critic` agent over `shots/` and re-score with
-`--critic audit/critic.json`. Without it Craft is unscored, the total is out of 80, and the
-scorecard carries a `NO_CRITIC` defect saying so.
+`--critic audit/critic.json`. Without it Craft is unscored, the total is scaled up from
+the deterministic points that could be scored (80 with a content brief, 70 without), and the scorecard carries a `NO_CRITIC` defect saying so.
 
-`--strict` promotes every accepted-but-unresolved P2 into a gate failure.
+`--strict` promotes every accepted-but-unresolved P2 into a gate failure. An unscored Craft (no `critic.json`) also fails the gate under `--strict`.
 
 ---
 

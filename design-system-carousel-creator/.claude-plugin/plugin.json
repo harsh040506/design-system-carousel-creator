@@ -1,0 +1,9 @@
+{
+  "name": "design-system-carousel-creator",
+  "displayName": "Design System Carousel Creator",
+  "version": "1.1.0",
+  "description": "Turns a brand design system plus source documents into a 50-card social-carousel template library, scored against a 100-point quality gate and previewed on a live canvas.",
+  "author": { "name": "Harsh Chhajer" },
+  "license": "MIT",
+  "keywords": ["design-system", "carousel", "templates", "social", "audit", "canvas"]
+}

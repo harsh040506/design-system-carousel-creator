@@ -1,6 +1,6 @@
 ---
 description: Extract atomic, sourced claims from documents into a content brief.
-argument-hint: <source-doc...> [--cards 50] [--out content-brief.json]
+argument-hint: "<source-doc...> [--cards 50] [--out build/content-brief.json]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent
 ---
 
@@ -28,7 +28,7 @@ Read every source document **completely**. Not skimmed, not sampled — slides w
 reading drift into generic filler by about card eight, and the drift is invisible until you read the
 library end to end.
 
-Produce `content-brief.json` against `${CLAUDE_PLUGIN_ROOT}/schema/content-brief.schema.json`.
+Produce `build/content-brief.json` against `${CLAUDE_PLUGIN_ROOT}/schema/content-brief.schema.json`.
 
 ## What a claim is
 

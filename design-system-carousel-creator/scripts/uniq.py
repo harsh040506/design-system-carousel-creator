@@ -59,7 +59,7 @@ GROUND_MIX = {
 def load_cards(path: pathlib.Path) -> list[dict]:
     if path.suffix.lower() in (".json",):
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data.get("cards", data if isinstance(data, list) else [])
+        return data if isinstance(data, list) else data.get("cards", [])
     html = path.read_text(encoding="utf-8", errors="replace")
     cards = []
     for i, m in enumerate(re.finditer(r'<div[^>]*class="[^"]*\bframe\b[^"]*"[^>]*>', html), 1):
@@ -128,8 +128,9 @@ def analyse(cards: list[dict]) -> dict:
         return sum(1 for c in cards if c.get(axis) == value)
 
     parts = Counter(c.get("partition") for c in cards if c.get("partition"))
+    # `flush` is full-bleed media, not a surface: it must not count toward the five.
     grounds = Counter(CHROME_ALIAS.get(c.get("chrome"), c.get("chrome"))
-                      for c in cards if c.get("chrome"))
+                      for c in cards if c.get("chrome") and c.get("chrome") != "flush")
     dist = {
         "partitions_used": len(parts),
         "partition_counts": dict(parts.most_common()),

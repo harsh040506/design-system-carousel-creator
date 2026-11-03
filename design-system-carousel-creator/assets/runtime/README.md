@@ -8,11 +8,24 @@ Two files that every generated library depends on. They are **copied verbatim** 
 | `support.js` | The design-canvas runtime: the `DCLogic` base class, the `<x-dc>` / `<helmet>` custom elements, and the prop-editor bridge that reads `data-props` and re-renders on change. Loaded from `<head>` **before** anything else. |
 | `image-slot.js` | The `<image-slot>` custom element: a user-fillable image placeholder supporting drag-and-drop, click-to-browse, pan/zoom reframing, and `src` prefill. Loaded inside `<helmet>`. |
 
+`vendor/` holds the two third-party libraries `support.js` needs at boot:
+
+| File | Version | Notes |
+|---|---|---|
+| `vendor/react.production.min.js` | React 18.3.1 | MIT, see `vendor/LICENSE-react.txt` |
+| `vendor/react-dom.production.min.js` | ReactDOM 18.3.1 | MIT, same licence |
+
+They are the exact builds `support.js` pins by SRI hash (sha384-DGyLxAy… and sha384-gTGxhz2…) and were
+verified against those hashes when vendored. Each generated document maps the unpkg URLs to
+`./vendor/…` through `window.__resources` (a hook `support.js` provides), so rendering needs no
+network. Without it `support.js` hides the template and then fails to boot: a blank page offline.
+Babel (only for `x-import` of `.jsx`) is not vendored; generated libraries do not use it.
+
 ## Why they are vendored rather than referenced
 
 A library that points at these files somewhere else on disk breaks the moment it is moved, zipped,
 or handed to someone else. Vendoring makes a built library a self-contained bundle: the `.dc.html`,
-the two runtime files, and nothing else required.
+the runtime files with their `vendor/` libraries, and nothing else required.
 
 `scripts/scaffold.py` copies both into the output directory on every build and verifies them
 afterwards, so "the runtime is always there" is a mechanical guarantee rather than a step someone
@@ -25,8 +38,12 @@ Both are generated artifacts:
 - `support.js` carries `// GENERATED from dc-runtime/src/*.ts — do not edit.`
 - `image-slot.js` carries `// Copied omelette starter.`
 
+The origin of both files is Anthropic's design-canvas tooling; they are included here as that tooling's
+runtime, not as original work of this repository, and are not covered by this repository's MIT licence
+unless their owner says so. Confirm redistribution terms before publishing this plugin widely.
+
 Treat them as opaque. If a newer version ships with a future export, replace the file wholesale —
-do not patch it. `scaffold.py --verify` checks size and header so a truncated or corrupted copy is
+do not patch it. `scaffold.py verify LIBRARY.dc.html` checks size and header so a truncated or corrupted copy is
 caught at build time instead of showing up as a blank artboard later.
 
 ## The contract they impose on generated markup

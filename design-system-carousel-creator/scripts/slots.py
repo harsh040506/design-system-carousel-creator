@@ -135,13 +135,16 @@ def cmd_fill(a) -> int:
 
     html = lib.read_text(encoding="utf-8")
     n = 0
-    for s, f in pairs:
+    # Positions come from the original text. Rewriting front-to-back shifted every
+    # later tag whenever a replaced src was a different length, so images landed in
+    # the wrong slots. Back-to-front keeps each remaining position exact.
+    for s, f in sorted(pairs, key=lambda sf: sf[0]["pos"], reverse=True):
         dst = images_dir / f.name
         if not dst.exists() or dst.stat().st_size != f.stat().st_size:
             shutil.copy2(f, dst)
         rel = f"./images/{f.name}"
         # rewrite in place by position, longest-last so offsets stay valid
-        tag_m = SLOT_RE.search(html, max(0, s["pos"] - 1))
+        tag_m = SLOT_RE.match(html, s["pos"]) or SLOT_RE.search(html, max(0, s["pos"] - 1))
         if not tag_m:
             continue
         body = tag_m.group(1)
@@ -184,7 +187,7 @@ def write_state(lib: pathlib.Path) -> pathlib.Path:
             prev = json.loads(p.read_text(encoding="utf-8")) or {}
         except Exception:
             prev = {}
-    state = dict(prev)
+    state = dict(prev) if isinstance(prev, dict) else {}
     for s in collect(lib):
         if s["src"]:
             entry = state.get(s["id"]) or {}
@@ -206,7 +209,7 @@ def cmd_audit(a) -> int:
     slots = collect(lib)
     empty = [s for s in slots if not s["src"]]
     missing = [s for s in slots if s["src"] and s["src"].startswith(".")
-               and not (lib.parent / s["src"].lstrip("./")).exists()]
+               and not (lib.parent / s["src"]).exists()]
     remote = [s for s in slots if s["src"].startswith(("http://", "https://"))]
     generic = [s for s in slots
                if s["placeholder"].strip().lower() in ("", "image", "photo", "picture")]
