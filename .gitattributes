@@ -1,0 +1,6 @@
+# Byte-exact files: the vendored React builds are checked against SRI hashes pinned
+# in support.js, so line-ending conversion on checkout would break them.
+design-system-carousel-creator/assets/runtime/vendor/** -text
+*.base64 -text
+*.woff2 binary
+*.png binary
