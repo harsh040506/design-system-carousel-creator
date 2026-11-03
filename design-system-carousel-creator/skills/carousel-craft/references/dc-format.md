@@ -197,7 +197,7 @@ Instagram portrait crop. Pick one per library and never mix.
 ```html
 <div style="background:var(--plate);min-width:0;overflow:hidden">
   <image-slot id="ed-01a" placeholder="Grayscale hero"
-              src="https://…/full/!800,800/0/default.jpg"></image-slot>
+              src="./media/ed-01a.jpg"></image-slot>
 </div>
 ```
 
@@ -207,8 +207,9 @@ Instagram portrait crop. Pick one per library and never mix.
 - `placeholder` is the empty-state label. Write a real description ("Grayscale hero", "Plate"),
   never "Image".
 - `src` prefills. A library that ships with every slot filled demos far better than one showing
-  forty grey rectangles — use openly-licensed sources (museum IIIF endpoints and similar) rather
-  than hotlinking arbitrary images.
+  forty grey rectangles. Use **local files** copied into the bundle (`dscc slots fill`), from openly
+  licensed sources. A remote URL is flagged `REMOTE_SLOT` (P1): a dead link renders worse than a
+  described slot, and the document must render offline.
 
 ---
 
@@ -216,10 +217,14 @@ Instagram portrait crop. Pick one per library and never mix.
 
 Three routes, all seen in the wild:
 
-1. **Google Fonts** — one `<link>` with every family combined into a single request.
+1. **Google Fonts** — one `<link>` with every family combined into a single request. This is the
+   scaffold's default and the one request a built library can make; if it is blocked the text falls
+   back to a system face rather than failing.
 2. **Local `@font-face`** in the `<helmet>` `<style>` for licensed faces, pointing at `./fonts/*.otf`.
-   If you do this, the font files become part of the bundle and must ship with it.
-3. **Icon webfonts** via CDN when a system needs a large icon set.
+   If you do this, the font files become part of the bundle and must ship with it. Combine with
+   `scaffold.py init --fonts none` for a bundle that makes no outside request at all.
+3. **Icon webfonts** via CDN when a system needs a large icon set (this reintroduces a network
+   dependency; prefer inline SVG).
 
 Always `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">` first — it measurably
 cuts first-paint time on a document this large.

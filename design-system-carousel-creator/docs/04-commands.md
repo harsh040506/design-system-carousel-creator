@@ -66,7 +66,7 @@ brand supplies no colour information at all, or the content is plainly for anoth
 ## `:distill`
 
 ```
-:distill <design-system.md|url|paste> [--out design-system.json]
+:distill <design-system.md|url|paste> [--out build/design-system.json]
 ```
 
 Reads a style guide, CSS file, Tailwind `@theme`, PDF brand book or pasted prose and extracts
@@ -81,7 +81,7 @@ the fraction that came from the source rather than derivation.
 ## `:brief`
 
 ```
-:brief <source-doc...> [--cards 50] [--out content-brief.json]
+:brief <source-doc...> [--cards 50] [--out build/content-brief.json]
 ```
 
 Reads every source **in full**. Extracts atomic claims with provenance spans.
@@ -94,7 +94,7 @@ inventing anything.
 ## `:plan`
 
 ```
-:plan [--cards 50] [--brief content-brief.json] [--out layout-plan.json]
+:plan [--cards 50] [--brief build/content-brief.json] [--out build/layout-plan.json]
 ```
 
 One mechanic tuple per card, claims assigned, fill/breathe intent declared. Check with
@@ -106,7 +106,7 @@ after the cards exist means rebuilding them.
 ## `:build`
 
 ```
-:build [--plan layout-plan.json] [--out "Brand Template Library.dc.html"]
+:build [--plan build/layout-plan.json] [--out "dist/Brand Template Library.dc.html"]
 ```
 
 Scaffold first, then write card composition into `build/build.py`. Never hand-edit the HTML.
@@ -126,7 +126,7 @@ See [Authoring cards](08-authoring.md).
 | Flag | |
 |---|---|
 | *(no args)* | inside a project, wires everything from the manifest |
-| `--strict` | every accepted-but-unresolved P2 becomes a gate failure |
+| `--strict` | every accepted-but-unresolved P2 becomes a gate failure, and so does an unscored Craft |
 | `--note "…"` | recorded in `audit/history.jsonl` alongside the score |
 | `--critic PATH` | merge the judged Craft dimension |
 | `--top N` | how many weak cards to table, default 8 |

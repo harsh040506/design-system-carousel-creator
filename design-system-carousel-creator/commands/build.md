@@ -1,6 +1,6 @@
 ---
 description: Compose the template library HTML from the system, brief and plan.
-argument-hint: [--plan layout-plan.json] [--out "Brand Template Library.html"]
+argument-hint: "[--plan build/layout-plan.json] [--out \"dist/Brand Template Library.dc.html\"]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 
 `$ARGUMENTS`
 
-Load `carousel-craft`. You need `design-system.json`, `content-brief.json` and `layout-plan.json` in
+Load `carousel-craft`. You need `build/design-system.json`, `build/content-brief.json` and `build/layout-plan.json` in
 hand — if any is missing, run its stage first rather than improvising it.
 
 ## Scaffold first — never hand-write the envelope

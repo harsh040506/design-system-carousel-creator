@@ -41,7 +41,9 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = pathlib.Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent
 MANIFEST = "project.json"
-CREATOR_VERSION = "1.0.0"
+sys.path.insert(0, str(HERE))
+from score import plugin_version  # noqa: E402  (one version source: .claude-plugin/plugin.json)
+CREATOR_VERSION = plugin_version()
 
 DEFAULT_LAYOUT = {"inputs": "inputs", "build": "build", "dist": "dist",
                   "audit": "audit", "shots": "shots"}
@@ -105,6 +107,18 @@ def stamp(project_dir: pathlib.Path, key: str, **extra) -> dict:
     return man
 
 
+def safe_filename(name: str) -> str:
+    """The name as a filename: legal on Windows and safe inside a URL.
+
+    The display name stays verbatim in project.json; only paths are cleaned. `"`,
+    `:`, `?` and friends are illegal in Windows paths, and `#` and `%` silently
+    truncate or corrupt the URL the canvas loads the library from.
+    """
+    s = re.sub(r'[<>:"/\\|?*#%\x00-\x1f]+', " ", name)
+    s = re.sub(r"\s+", " ", s).strip(" .")
+    return s or slugify(name)
+
+
 def default_manifest(name: str, *, brand: str | None = None,
                      width: int = 1080, height: int = 1440,
                      cards: int = 50, columns: int = 5) -> dict:
@@ -125,7 +139,7 @@ def default_manifest(name: str, *, brand: str | None = None,
             "brief": "build/content-brief.json",
             "plan": "build/layout-plan.json",
             "builder": "build/build.py",
-            "library": f"dist/{name}.dc.html",
+            "library": f"dist/{safe_filename(name)}.dc.html",
             "canvas": "dist/canvas.html",
             "scorecard": "audit/scorecard.json",
             "critic": "audit/critic.json",
@@ -207,8 +221,14 @@ Created {created}{constraints}
 
 def cmd_new(a) -> int:
     name = a.name.strip()
+    if not name:
+        print("a project needs a name")
+        return 1
     root = pathlib.Path(a.into or ".").resolve()
-    target = root / (a.dirname or name)
+    # The display name is kept verbatim in project.json; only the folder is made
+    # filesystem-safe. A name like `Q3 "Launch": v2?` is legal prose and an illegal
+    # Windows path, and used to end in a traceback instead of a project.
+    target = root / (a.dirname or safe_filename(name))
 
     if target.exists() and any(target.iterdir()) and not a.force:
         print(f"refusing to write into a non-empty directory: {target}")
@@ -241,6 +261,13 @@ def cmd_new(a) -> int:
         if not src.exists():
             print(f"  ! input not found, recorded by path only: {src}")
             return str(src)
+        if src.is_dir():
+            # A folder of sources is frozen whole; copy2 on a directory used to crash
+            # after the project folders already existed.
+            dst = inputs_dir / src.name
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+            frozen.append(f"{man['layout']['inputs']}/{src.name}/")
+            return f"{man['layout']['inputs']}/{src.name}"
         if src.stat().st_size > FREEZE_LIMIT:
             print(f"  ! {src.name} is {src.stat().st_size // 1_048_576} MB — "
                   f"recorded by path, not copied")
@@ -326,7 +353,13 @@ def cmd_adopt(a) -> int:
         return 1
 
     name = a.name or src.name
-    target = pathlib.Path(a.into).resolve() if a.into else (src.parent / name)
+    # Without --into the project used to be created *inside* the folder being
+    # adopted, overwriting its README while promising the original was untouched.
+    target = (pathlib.Path(a.into).resolve() if a.into
+              else src.parent / f"{safe_filename(name)} (project)")
+    if target == src or src in target.parents:
+        print(f"refusing to adopt {src} into itself — pass --into a different folder")
+        return 1
     man = default_manifest(name)
     if a.independent:
         man["constraints"]["independent_cards"] = True
@@ -466,7 +499,7 @@ def cmd_adopt(a) -> int:
     if len(moved) > 40:
         print(f"  … {len(moved) - 40} more")
     print(f"\n  the original at {src} is untouched — verify, then delete it yourself")
-    print(f"next:  python {HERE.name}/../scripts/dscc.py audit  (from inside the project)")
+    print(f'next:  python "{HERE / "dscc.py"}" audit  (from inside the project)')
     return 0
 
 
@@ -544,6 +577,7 @@ def append_history(project_dir: pathlib.Path, scorecard: dict,
     hp.parent.mkdir(parents=True, exist_ok=True)
     row = {
         "at": now(),
+        "scorer_version": scorecard.get("scorer_version"),
         "total": scorecard.get("total"),
         "gate": scorecard.get("gate"),
         "dimensions": scorecard.get("dimensions"),
@@ -646,7 +680,7 @@ def cmd_info(a) -> int:
         for h in hist[-6:]:
             dims = h.get("dimensions") or {}
             miss = ",".join(k for k, v in dims.items() if v is None) or "-"
-            print(f"    {h['at'][:19]}  {h.get('total', 0):>5}  {h.get('gate', '?'):<4}"
+            print(f"    {str(h.get('at', ''))[:19]}  {h.get('total') or 0:>5}  {h.get('gate') or '?':<4}"
                   f"  min {h.get('min_card') or 0:>5.1f}  unscored:{miss}")
 
     lib = path_of(d, m, "library")

@@ -205,5 +205,5 @@ The canvas is regenerated on every scaffold, so edits to a bundle's copy are los
 python ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.py canvas dist/
 ```
 
-Placeholders substituted at install time: `__FONT_FACE__`, `__DOC_SRC__`, `__DOC_TITLE__`,
+Placeholders substituted at install time: `__FONT_FACE__`, `__DOC_SRC__`, `__DOC_SRC_JS__`, `__DOC_TITLE__`,
 `__CARD_W__`, `__CARD_H__`, `__DEFAULT_DARK__`.

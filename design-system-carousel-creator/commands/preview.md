@@ -1,6 +1,6 @@
 ---
 description: Serve the bundle and open the canvas — pan, zoom, theme, card index, audit overlay.
-argument-hint: [--watch] [--port 4173] [--no-open]
+argument-hint: "[--watch] [--port 4173] [--no-open] [--dir DIR]"
 allowed-tools: Bash, Read
 ---
 

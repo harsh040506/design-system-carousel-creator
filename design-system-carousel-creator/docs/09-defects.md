@@ -40,7 +40,8 @@ A tag is never closed. Reported with a line number.
 minute, at card 50 it is an hour of bisecting.
 
 ### `UNDECLARED_VAR` · P0
-A `var(--x)` resolves to nothing declared in `:root` or set in `applyTheme()`.
+A `var(--x)` with no fallback and no `--x:` declaration or `setProperty('--x', …)` anywhere in
+the document. `var(--x, fallback)` is not flagged.
 
 **Fix:** declare the token, or use an existing role.
 
@@ -75,7 +76,9 @@ An inline `font-size`.
 editing nine numbers.
 
 ### `OFF_SCALE` · P2
-A pixel value in the stylesheet that is not on any declared scale.
+A pixel value in the stylesheet that is not on any declared scale. The scorecard lists the
+values in one entry; the points themselves come from the number of distinct computed font sizes
+and gaps.
 
 **Fix:** collapse to the nearest locked step.
 
@@ -92,6 +95,8 @@ a feature grid becomes an icon matrix.
 
 ### `WEB_CHROME_COPY` · P2
 Call-to-action or pricing copy — "sign up", "book a demo", "per month", "billed annually".
+
+**Fix:** rewrite it as a statement.
 
 ### `MONO_THEME_TOKEN` · P1
 A colour-valued property declared in `:root`, used in card markup, and present in **neither**
@@ -129,7 +134,7 @@ Bottom slack over 160px with no declared license.
 Legal licenses: `cover`, `close`, `single-figure`, `media-led`, `few-rows`, `section-break`.
 
 ### `FALSE_LICENSE` · P1
-A `breathe` license that does not match the card's actual shape.
+A `few-rows` license on a card with more than 14 measured content boxes.
 
 **Fix:** remove the license and fill.
 **Not:** widen what the license means.
@@ -143,7 +148,10 @@ A text-dominant card above 88% ink coverage.
 Full-bleed media cards are exempt; they cover the artboard by design.
 
 ### `CROWDED` · P2
-Rows too tight against each other.
+Less than 24px between the lowest content and the footer rule. A `.note` pinned to the rule is
+exempt.
+
+**Fix:** cut a row or shorten copy.
 
 ### `GAP_VARIANCE` · P2
 Library-wide gap coefficient of variation above 0.35.
@@ -169,20 +177,46 @@ reads as repetitive.
 
 **Fix:** vary a second axis on the closest pairs.
 
+### `NARROW_RANGE` · P2
+Fewer than eight of the ten partitions are used.
+
+**Fix:** move cards onto unused partitions.
+
 ### `OVERUSED` · P2
-One partition dominates the library.
+One partition carries more than nine cards.
+
+**Fix:** move the excess cards onto unused partitions.
 
 ### `MIX_OFF` · P2
-The distribution of mechanics is skewed against the target mix.
+The media, figure or ground counts are outside the target mix (scaled to the library's size).
 
-### `FLAT_SURFACES` · P2
-Fewer than five distinct grounds.
+**Fix:** re-plan those assignments toward the target.
+
+### `BAD_AXIS` · P2
+A mechanic axis value that is not in the vocabulary in
+[`mechanics.md`](../skills/carousel-craft/references/mechanics.md). Usually a typo in the plan.
+
+### `DUP_NAME` · P2
+Two cards share a layout name. Names are how the plan, the builder and the report refer to a
+card, so a duplicate makes every one of those references ambiguous.
+
+### `FLAT_SURFACES` · P1
+Fewer than five distinct grounds. Costs 5 Distinction points, so even a perfect 15 drops to 10 and
+fails the Distinction ≥ 11 gate on its own.
 
 **Fix:** assign more grounds. This is the highest-leverage move for perceived range and the one
 generated libraries most consistently skip.
 
 ### `GROUND_CLUSTER` · P2
-Two loud grounds (`ink`, `accent-1`, `accent-2`) on adjacent cards.
+Two adjacent cards on the **same** loud ground (`ink`, `accent-1` or `accent-2`). Costs 1 Distinction point per
+pair, to a maximum of 2.
+
+**Fix:** move one of the pair, or give it another ground.
+
+### `SLACK_REVIEW` · P2
+A card with a legal `breathe` license and more than 520px of bottom slack that the critic has not
+signed off. It clears when the card's index appears in `slack_signoff` in `critic.json`, or when the
+card is filled.
 
 ---
 
@@ -202,6 +236,13 @@ A number on a card that does not appear anywhere in the brief.
 like `&#9671;` in a shared footer survives tag-stripping as `9671` and reads as a figure. Write
 literal characters — the document is UTF-8.
 
+A claim's `figure` field counts as brief text, so a number that lives only there is sourced.
+
+### `CLAIM_REUSE` · P2
+One or more claims carried by more than two cards. Costs the 1 Veracity point for claim spread.
+
+**Fix:** draw a different claim from the unused pool.
+
 ---
 
 ## Constraints
@@ -216,8 +257,8 @@ A card depends on having read another.
 **Not:** delete the sentence — that leaves the card thinner than it was.
 
 ### `SOURCE_LEAK` · P0
-A forbidden term or attribution shape, in a card **or** in the chrome (header, `<title>`, format
-labels, `alt` text).
+A forbidden term or attribution shape, in a card **or** in the chrome (header, eyebrow,
+`<title>`, format labels). Attribute values such as `alt` are not scanned.
 
 **Fix:** remove it, including from the chrome — that is where a removed title reappears.
 
@@ -232,13 +273,27 @@ An entry in `forbidden_patterns` is not a valid regex. Named rather than crashin
 ## Meta
 
 ### `NO_CRITIC` · P2
-No `critic.json`, so Craft's twenty points are unscored and the total is out of 80.
+No `critic.json`, so Craft's twenty points are unscored and the total is scaled up from
+the deterministic points that could be scored (80 with a content brief, 70 without).
 
 **Fix:** run the `design-critic` agent over `shots/` and re-score with `--critic`.
 
-Present in the defect list rather than as a footnote, because a total out of 80 presented as
-though it were out of 100 is the exact dishonesty the benchmark caveats exist to prevent.
+Present in the defect list rather than as a footnote, because a scaled total presented as
+though it were a full 100 is the exact dishonesty the benchmark caveats exist to prevent.
 Under `--strict` it fails the gate.
+
+---
+
+## Media slots
+
+Reported by `scripts/slots.py audit`, not by the scorecard. It exits non-zero on a P0.
+
+| Code | Severity | Means |
+|---|---|---|
+| `EMPTY_SLOT` | P1 | a slot has no `src` yet (the scorecard's `EMPTY_SLOT` is the rendered-size check above) |
+| `BROKEN_SLOT` | P0 | a relative `src` points at a file that does not exist |
+| `REMOTE_SLOT` | P1 | an `http(s)` `src` — the bundle must render offline, so copy the file in |
+| `VAGUE_PLACEHOLDER` | P2 | the placeholder says "image" or "photo" instead of describing the subject |
 
 ---
 
@@ -261,6 +316,7 @@ Each card starts at 100 and loses:
 | `OVERPACKED` | −5 |
 | `CROWDED` | −4 |
 | `EMPTY_SLOT` | −3 |
+| Craft (with a critic) | −1.2 × (20 − the card's craft points) |
 
 Gate floor is 70 per card. The weakest card matters more than the average — a reader hits it
 and the whole set loses credibility.

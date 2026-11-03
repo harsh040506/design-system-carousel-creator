@@ -31,10 +31,12 @@ PROBE_JS = r"""
 
   // ---- locate artboards -----------------------------------------------
   let cards = [];
+  let usedAuto = false;
   if (cfg.selector) {
     cards = Array.from(document.querySelectorAll(cfg.selector));
   }
   if (!cards.length) {
+    usedAuto = true;
     // Auto-detect: the artboard is the fixed pixel width that repeats most.
     const tally = new Map();
     for (const el of document.querySelectorAll('*')) {
@@ -122,7 +124,7 @@ PROBE_JS = r"""
 
       const isChrome = el.matches(CHROME) || el.closest(CHROME);
       const text = hasOwnText(el);
-      const media = ['img', 'img-slot', 'image-slot', 'svg', 'canvas', 'picture', 'video'].includes(box.tag);
+      const media = ['img', 'image-slot', 'svg', 'canvas', 'picture', 'video'].includes(box.tag);
       const filled = (() => {
         const c = parseRGB(s.backgroundColor);
         return (c && c.a > 0.02) || s.backgroundImage !== 'none';
@@ -315,7 +317,8 @@ PROBE_JS = r"""
   return {
     cards: out,
     fonts_ready: document.fonts ? document.fonts.status : 'unknown',
-    detected: cards.length
+    detected: cards.length,
+    used_auto: usedAuto
   };
 }
 """
@@ -350,6 +353,9 @@ def measure(path: pathlib.Path, selector: str | None, shots: pathlib.Path | None
 
         if shots:
             shots.mkdir(parents=True, exist_ok=True)
+            # Stale card-41..50.png from a longer earlier run would reach the critic.
+            for old in shots.glob("card-*.png"):
+                old.unlink()
             sel = selector or ".frame"
             els = page.query_selector_all(sel)
             if not els:
@@ -363,7 +369,12 @@ def measure(path: pathlib.Path, selector: str | None, shots: pathlib.Path | None
 
     data["source"] = str(path)
     data["rhythm"] = rhythm
-    data["degraded"] = selector is None
+    # The selector matching nothing falls back to auto-detection; that is degraded
+    # too, and saying otherwise scored an empty scaffold's gallery as one clean card.
+    data["degraded"] = selector is None or bool(data.get("used_auto"))
+    if selector and data.get("used_auto"):
+        print(f"  ! selector {selector!r} matched nothing; artboards were auto-detected",
+              file=sys.stderr)
     _summarise(data, rhythm)
     return data
 

@@ -51,13 +51,16 @@ Mechanics are the six-axis vocabulary in [Concepts](02-concepts.md#3--uniqueness
 2. Describe it in
    [`references/mechanics.md`](../skills/carousel-craft/references/mechanics.md) — what it is
    *for* and how it fails, not just what it looks like
-3. Add the primitive to `kernel.css` if it needs one
+3. Add the same value to `VOCAB` in [`scripts/uniq.py`](../scripts/uniq.py) — otherwise every
+   card using it gets `BAD_AXIS`. A new ground also needs `GROUND_MIX` there and a `g-<name>`
+   class in the brand CSS
+4. Add the primitive to `kernel.css` if it needs one
 
-`uniq.py` reads the tuple generically, so distance and collision checking pick it up with no
-code change.
+`uniq.py` then computes distance and collisions over it with no other change.
 
 **Adding a value widens the space; it does not raise the bar.** The distance threshold is what
-prevents fifty near-identical cards, and that is a constant in `score.py`.
+prevents fifty near-identical cards, and it is a constant in `uniq.py` (`TARGETS`) and
+`score.py`.
 
 ---
 
@@ -79,7 +82,10 @@ LEGAL_FIX["MY_CODE"] = "the one correct fix -- not the cosmetic one"
 DEFECT_DIM["MY_CODE"] = "discipline"
 ```
 
-If it should cost per-card points, add it to the deduction list in `score()`.
+`score()` does not forward lint codes generically: copy the `MONO_THEME_TOKEN` loop to bring
+it into the scorecard, or it stays in `lint.json` and never reaches the gate. If it should cost
+per-card points, add it to the deduction list too. `tests/test_regressions.py` fails until the
+new code has a `legal_fix` and a section in [09-defects.md](09-defects.md).
 
 Two rules worth keeping:
 
@@ -93,7 +99,10 @@ makes the work worse. Write it down in the `legal_fix` string.
 
 ## Tuning the gate
 
-All thresholds are constants at the top of [`scripts/score.py`](../scripts/score.py):
+Score thresholds are constants at the top of [`scripts/score.py`](../scripts/score.py) (plus
+the inline gap-CV 0.35, `CROWDED` 24px and `few-rows` 14-box limits in `score()`); distinction
+targets are `TARGETS` and `GROUND_MIX` in [`scripts/uniq.py`](../scripts/uniq.py); the gap ceiling
+(1.5 × rhythm) is in [`scripts/measure.py`](../scripts/measure.py).
 
 ```python
 WEIGHTS = {"integrity": 20, "discipline": 15, "density": 20,
@@ -102,6 +111,7 @@ GATE = {"total": 80, "min_card": 70, "density": 15, "distinction": 11}
 COVERAGE_FLOOR = 0.40
 COVERAGE_CEIL = 0.88
 SLACK_FREE = 160
+SLACK_REVIEW = 520
 LEGAL_LICENSES = {"cover", "close", "single-figure", "media-led", "few-rows", "section-break"}
 ```
 
@@ -220,3 +230,18 @@ The plugin name determines the command namespace (`/<plugin-name>:build`). To re
 4. every `/<old-name>:` reference in `commands/` and `docs/`
 
 `${CLAUDE_PLUGIN_ROOT}` handles script paths, so those need no change.
+
+
+---
+
+## Running the tests
+
+```
+python -m unittest discover -s tests -v        # from the plugin root
+claude plugin validate .                       # manifest, commands, agents, skills
+```
+
+The unit tests are stdlib-only (no browser, no network) and pin the defects found while hardening the
+plugin: the `RAW_PX` allow-list, the `©` attribution pattern, the Distinction and Craft scoring rules,
+project-name escaping in the builder and canvas, the vendored React hashes, and command frontmatter.
+`dscc.py audit` on a real project is the end-to-end check for the browser-side measurements.

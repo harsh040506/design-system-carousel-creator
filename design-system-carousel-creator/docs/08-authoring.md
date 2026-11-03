@@ -49,7 +49,7 @@ Regeneration is cheap and cannot go stale.
 ### 2 · Tokens into `:root` *before* the CSS layer
 
 ```python
-doc = inject_tokens(doc, TOKENS_DARK)   # first
+doc = inject_tokens(doc, TOKENS_LIGHT)  # first — :root carries the light defaults
 doc = insert_css(doc)                   # second
 ```
 
@@ -222,7 +222,8 @@ Three registers per card, maximum: **display**, **body**, **micro**.
 The micro register — corner labels, index numbers, credits, bracketed asides — is where density
 comes from without loudness. It is the register most often missing from generated work.
 
-Display floor is 46px, set by thumbnail legibility at 3.6× reduction. The nine type classes in
+Display floor is 120px (`--t-display`) and anything carrying the point is at least 52px
+(`--t-heading`), set by thumbnail legibility at 3.6× reduction. The nine type classes in
 `kernel.css` are the whole ramp; a card that sets its own font properties is drift.
 
 ---

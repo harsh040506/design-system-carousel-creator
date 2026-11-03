@@ -69,9 +69,11 @@ Anything else is unlicensed slack, which is a defect.
 
 ### The license is recorded, not remembered
 
-The manifest carries `intent` and `license` per card. The auditor cross-checks: a card using `-top`
-without a declared license fails `UNLICENSED_SLACK`; a card declaring `few-rows` with six rows fails
-`FALSE_LICENSE`. This prevents the license from decaying into "I'll mark them all breathe."
+The plan carries `intent` and `license` per card, and the builder writes them as `data-intent` and
+`data-license`. The auditor cross-checks: a card with more than 160px of bottom slack and no
+`data-intent="breathe"` plus a legal `data-license` fails `UNLICENSED_SLACK`; a `few-rows` card with
+more than 14 measured content boxes fails `FALSE_LICENSE` (the plan schema separately caps `rows`
+at 4). This prevents the license from decaying into "I'll mark them all breathe."
 
 ---
 
@@ -86,7 +88,7 @@ runs, cheap, and errs slightly generous, which keeps it from becoming a nuisance
 
 Coverage below 40% is `SPARSE` and, again, is resolved by writing.
 
-The upper bound matters too. Above ~78% a card has no breathing room at all and reads as a wall;
+The upper bound matters too. Above ~88% (text-only cards; a full-bleed photograph is covered by design) a card has no breathing room at all and reads as a wall;
 that emits `OVERPACKED`, resolved by splitting the card in two — which is usually the right answer,
 since it means the card was carrying more than one idea.
 
@@ -112,7 +114,7 @@ several sessions and is invisible when looking at any two of them side by side.
 | < 24px | `CROWDED` — content is jammed into the footer, add breathing room |
 | 24–160px | normal, no comment |
 | 160–520px | requires a declared license |
-| > 520px | requires a license **and** a critic sign-off; this much quiet is a strong statement and needs to be an intentional one |
+| > 520px | requires a license **and** a critic sign-off (`slack_signoff` in `critic.json`); until it arrives the card carries a `SLACK_REVIEW` P2. This much quiet is a strong statement and needs to be an intentional one |
 
 ---
 
@@ -124,6 +126,6 @@ several sessions and is invisible when looking at any two of them side by side.
 | `SPARSE` (coverage < 40%) | P1 | add content, enlarge media, promote a figure | stretch existing rows |
 | `UNLICENSED_SLACK` | P1 | declare a license, or fill | leave it |
 | `FALSE_LICENSE` | P1 | remove the license and fill | widen the license definition |
-| `OVERPACKED` (coverage > 78%) | P2 | split into two cards | shrink type |
+| `OVERPACKED` (text-only coverage > 88%) | P2 | split into two cards | shrink type |
 | `CROWDED` (slack < 24px) | P2 | cut a row, or shorten copy | reduce the footer margin |
 | `GAP_VARIANCE` (library CV > 0.35) | P2 | normalise the outlier cards to the rhythm | adjust `--rhythm` to fit the mess |

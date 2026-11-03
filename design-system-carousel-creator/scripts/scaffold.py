@@ -23,11 +23,13 @@ or nothing rendered at all.
 from __future__ import annotations
 
 import argparse
+import html as _html
 import json
 import pathlib
 import re
 import shutil
 import sys
+import urllib.parse
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -36,6 +38,8 @@ RUNTIME_DIR = HERE.parent / "assets" / "runtime"
 CANVAS_SRC = HERE.parent / "assets" / "canvas" / "canvas.html"
 CANVAS_FONT = HERE.parent / "assets" / "canvas" / "JetBrainsMono-latin.woff2.base64"
 RUNTIME_FILES = ["support.js", "image-slot.js"]
+VENDOR_FILES = ["react.production.min.js", "react-dom.production.min.js", "LICENSE-react.txt"]
+DEFAULT_FONTS_URL ="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap"
 SLOT_STATE = ".image-slots.state.json"
 
 # Minimum plausible size for each runtime file. A truncated copy is worse than a
@@ -61,6 +65,22 @@ def install_runtime(outdir: pathlib.Path, quiet: bool = False) -> list[str]:
             continue
         shutil.copy2(src, dst)
         done.append(f"  + {name} ({src.stat().st_size // 1024} KB)")
+
+    # React and ReactDOM travel with the bundle. support.js would otherwise fetch
+    # them from unpkg.com on every render, and offline (or behind a proxy that
+    # blocks it) it hides the template and then fails to boot: a blank page.
+    vend = outdir / "vendor"
+    vend.mkdir(exist_ok=True)
+    for name in VENDOR_FILES:
+        src = RUNTIME_DIR / "vendor" / name
+        if not src.exists():
+            sys.exit(f"FATAL: vendored library missing: {src}\n"
+                     f"Restore assets/runtime/vendor/ before building.")
+        dst = vend / name
+        if dst.exists() and dst.stat().st_size == src.stat().st_size:
+            continue
+        shutil.copy2(src, dst)
+        done.append(f"  + vendor/{name} ({src.stat().st_size // 1024} KB)")
     if not quiet:
         print(f"runtime -> {outdir}")
         for line in done:
@@ -123,11 +143,18 @@ def install_canvas(outdir: pathlib.Path, manifest: dict | None = None,
     theme = ((manifest or {}).get("theme") or {}).get("default", "Black")
     title = (manifest or {}).get("name") or doc.replace(".dc.html", "")
 
+    # Each placeholder is escaped for the context it lands in. A project called
+    # `Q3 "Launch" #2` must not close an attribute, end a JS string or become a
+    # URL fragment.
+    src_url = "./" + urllib.parse.quote(doc)
+    doc_js = json.dumps(src_url).replace("</", "<\\/")
+
     html = CANVAS_SRC.read_text(encoding="utf-8")
     html = (html
             .replace("__FONT_FACE__", _font_face())
-            .replace("__DOC_SRC__", "./" + doc)
-            .replace("__DOC_TITLE__", title.replace("&", "&amp;").replace("<", "&lt;"))
+            .replace("__DOC_SRC_JS__", doc_js)
+            .replace("__DOC_SRC__", _html.escape(src_url, quote=True))
+            .replace("__DOC_TITLE__", _html.escape(title, quote=True))
             .replace("__CARD_W__", str(cv.get("width", 1080)))
             .replace("__CARD_H__", str(cv.get("height", 1440)))
             .replace("__DEFAULT_DARK__", "true" if theme == "Black" else "false"))
@@ -166,6 +193,11 @@ def verify_runtime(outdir: pathlib.Path) -> list[str]:
         head = p.read_text(encoding="utf-8", errors="replace")[:400]
         if EXPECT_HEAD[name] not in head:
             problems.append(f"WRONG FILE: {name} does not look like the expected runtime")
+    for name in VENDOR_FILES[:2]:
+        p = outdir / "vendor" / name
+        if not p.exists() or p.stat().st_size < 5_000:
+            problems.append(f"MISSING: vendor/{name} -- React is not bundled, so the library "
+                            f"needs unpkg.com at render time and is blank offline")
     return problems
 
 
@@ -216,6 +248,8 @@ def install_assets(outdir: pathlib.Path, fonts: pathlib.Path | None,
 
 ENVELOPE_CHECKS = [
     (r'<script src="\./support\.js"></script>', "support.js not loaded from <head>"),
+    (r"window\.__resources\s*=", "React is not mapped to ./vendor/ -- support.js will "
+                                 "fetch it from unpkg.com and the library is blank offline"),
     (r"<x-dc>", "missing <x-dc> component root"),
     (r"<helmet>", "missing <helmet> block"),
     (r"data-dc-script", "missing the data-dc-script logic block"),
@@ -255,7 +289,8 @@ def verify_document(path: pathlib.Path) -> tuple[list[str], list[str]]:
         for key in re.findall(r"['\"]?([A-Za-z][A-Za-z0-9-]*)['\"]?\s*:\s*['\"]", block):
             setprop.add("--" + key)
 
-    used = set(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)", html))
+    # Same rule as lint.py: `var(--x, fallback)` resolves without a declaration.
+    used = set(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)\s*\)", html))
     missing = sorted(used - declared - setprop)
     for v in missing[:10]:
         problems.append(f"undeclared custom property: {v}")
@@ -285,15 +320,17 @@ HEAD_TMPL = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>window.__resources = {{
+  "https://unpkg.com/react@18.3.1/umd/react.production.min.js": "./vendor/react.production.min.js",
+  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js": "./vendor/react-dom.production.min.js"
+}};</script>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
 <meta name="design_doc_mode" content="canvas">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-<link href="{fonts}" rel="stylesheet">
-<script src="./image-slot.js"></script>
+{font_tags}<script src="./image-slot.js"></script>
 <style>
   :root {{
 {tokens}
@@ -348,7 +385,10 @@ DEFAULT_PROPS = {
 def cmd_init(a) -> int:
     out = pathlib.Path(a.output)
     system = {}
-    if a.system and pathlib.Path(a.system).exists():
+    if a.system:
+        # A mistyped --system used to scaffold silently with placeholder tokens.
+        if not pathlib.Path(a.system).exists():
+            sys.exit(f"not found: {a.system} (--system takes build/design-system.json)")
         system = json.loads(pathlib.Path(a.system).read_text(encoding="utf-8"))
 
     themes = system.get("themes", {})
@@ -356,8 +396,9 @@ def cmd_init(a) -> int:
     dark = themes.get("dark", {}) or {"--paper": "#111111", "--ink": "#F2F2F2"}
 
     def jsobj(d):
-        inner = ", ".join(f"'{k.lstrip('-')}': '{v}'" for k, v in d.items())
-        return "{ " + inner + " }"
+        # json.dumps, not hand-quoting: a value like "'Fraunces', serif" used to end
+        # the string early and leave applyTheme a syntax error and the library blank.
+        return json.dumps({k.lstrip("-"): v for k, v in d.items()}, ensure_ascii=False)
 
     flat = {}
     for group in ("constant", "typography", "type", "figures", "weights", "spacing",
@@ -371,16 +412,27 @@ def cmd_init(a) -> int:
     tokens.setdefault("--gallery-mute", "#9C9C9C")
     tokens.setdefault("--font-body", "system-ui, sans-serif")
     tokens.setdefault("--font-display", "Georgia, serif")
+    tokens.setdefault("--label-vis", "block")     # applyTheme toggles it; :root declares it
 
     token_lines = "\n".join(f"    {k}: {v};" for k, v in tokens.items())
     canvas = system.get("canvas", {})
     props = json.dumps(DEFAULT_PROPS).replace('"', "&quot;")
 
+    fonts = (a.fonts or "").strip()
+    if fonts.lower() in ("", "none"):
+        font_tags = ""
+    else:
+        font_tags = ('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">\n'
+                     f'<link href="{_html.escape(fonts, quote=True)}" rel="stylesheet">\n')
+
+    def esc(s: str) -> str:
+        return _html.escape(str(s), quote=False)
+
     html = HEAD_TMPL.format(
-        fonts=a.fonts, tokens=token_lines,
-        eyebrow=a.eyebrow or f"{system.get('brand', 'Library')} · {canvas.get('width', 1080)} × {canvas.get('height', 1440)}",
-        title=a.title or system.get("brand", "Template Library"),
-        blurb=a.blurb or "Generated by Design System Carousel Creator.",
+        font_tags=font_tags, tokens=token_lines,
+        eyebrow=esc(a.eyebrow or f"{system.get('brand', 'Library')} · {canvas.get('width', 1080)} × {canvas.get('height', 1440)}"),
+        title=esc(a.title or system.get("brand", "Template Library")),
+        blurb=esc(a.blurb or "Generated by Design System Carousel Creator."),
         cols=a.cols, w=canvas.get("width", 1080),
         props=props, light=jsobj(light), dark=jsobj(dark),
     )
@@ -401,7 +453,7 @@ def cmd_init(a) -> int:
                    pathlib.Path(a.logos_dir) if a.logos_dir else None)
 
     if not a.no_builder:
-        emit_builder(out, man, cols=a.cols,
+        emit_builder(out, man, cols=a.cols, fonts=a.fonts,
                      theme=((man or {}).get("theme") or {}).get("default", "Black"))
 
     print("\nInsert cards at the <!-- CARDS GO HERE --> marker, then:")
@@ -426,7 +478,8 @@ BUILDER_TMPL = HERE.parent / "assets" / "builder" / "build.py.tmpl"
 
 
 def emit_builder(document: pathlib.Path, manifest: dict | None,
-                 cols: int = 5, theme: str = "Black") -> pathlib.Path | None:
+                 cols: int = 5, theme: str = "Black",
+                 fonts: str = DEFAULT_FONTS_URL) -> pathlib.Path | None:
     """Write build/build.py unless one already exists.
 
     Never overwrites: the emitted file is a starting point that gets filled in with
@@ -445,7 +498,9 @@ def emit_builder(document: pathlib.Path, manifest: dict | None,
         lib_rel = document.resolve().relative_to(root).as_posix()
         name = manifest.get("name") or document.stem
     else:
-        dst = document.parent / "build.py"
+        # The builder treats its parent's parent as the project root, so outside a
+        # project it lives in <doc dir>/build/ to keep the library where it is.
+        dst = document.parent / "build" / "build.py"
         lib_rel = document.name
         name = document.stem.replace(".dc", "")
 
@@ -453,8 +508,21 @@ def emit_builder(document: pathlib.Path, manifest: dict | None,
         print(f"  = {dst.name} (kept — a builder already exists)")
         return dst
 
+    def py_str(s: str) -> str:
+        """Body of a double-quoted Python literal (no surrounding quotes)."""
+        return json.dumps(s, ensure_ascii=False)[1:-1]
+
+    # The name lands in three kinds of place: a docstring / CSS comment (where a
+    # triple quote or `*/` would end it early) and string literals (where a `"`
+    # would). A project called `Q3 "Launch" #2` used to emit a builder that did not
+    # parse.
+    doc_name = (name.replace("\\", "/").replace('"""', "'''").replace("*/", "* /")
+                    .replace("\n", " "))
     src = BUILDER_TMPL.read_text(encoding="utf-8")
-    src = (src.replace("__PROJECT_NAME__", name)
+    src = (src.replace("__PROJECT_NAME_STR__", py_str(name))
+              .replace("__LIBRARY_REL_STR__", py_str(lib_rel))
+              .replace("__FONTS_STR__", py_str(fonts or "none"))
+              .replace("__PROJECT_NAME__", doc_name)
               .replace("__PLUGIN_ROOT__", str(HERE.parent))
               .replace("__LIBRARY_REL__", lib_rel)
               .replace("__COLS__", str(cols))
@@ -545,9 +613,10 @@ def main() -> None:
     i.add_argument("--title", default=None)
     i.add_argument("--eyebrow", default=None)
     i.add_argument("--blurb", default=None)
-    i.add_argument("--cols", type=int, default=8)
-    i.add_argument("--fonts", default="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap",
-                   help="webfont stylesheet URL for the <link> tag")
+    i.add_argument("--cols", type=int, default=5)
+    i.add_argument("--fonts", default=DEFAULT_FONTS_URL,
+                   help="webfont stylesheet URL for the <link> tag. Pass '' (or 'none') "
+                        "to emit no external request and rely on --fonts-dir / system fonts")
     i.add_argument("--fonts-dir", default=None,
                    help="directory of licensed font files to copy into ./fonts/")
     i.add_argument("--logos-dir", default=None,

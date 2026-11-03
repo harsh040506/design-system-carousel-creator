@@ -117,8 +117,8 @@ content, so composition has nowhere to hide.
 ## 7 · Every card is legible at thumbnail scale
 
 A carousel is consumed at ~300px wide in a feed. The rule that follows: **the single idea of each
-card must survive a 3.6× reduction.** Display type at 62–104px on a 1080 artboard, never below 46px
-for anything carrying the point. Supporting text may become texture at that scale — that is fine and
+card must survive a 3.6× reduction.** Display type at ≥120px (`--t-display`) on a 1080 artboard, never below 52px
+(`--t-heading`) for anything carrying the point. Supporting text may become texture at that scale — that is fine and
 expected — but the headline may not.
 
 ---

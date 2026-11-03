@@ -1,6 +1,6 @@
 ---
 description: Verify the gate, version the library, and write the release record.
-argument-hint: <library.html> [--version 1.0.0]
+argument-hint: "<library.html> [--version 1.0.0]"
 allowed-tools: Read, Write, Edit, Bash, Glob
 ---
 
@@ -32,7 +32,7 @@ total says — the user asked for something binary and it is either true of the 
 
 If it fails, **do not ship and do not soften the report**. Say which condition failed, by how much,
 and what it would take. Reporting a failing library as shipped is a worse outcome than shipping
-late — and if Craft was never scored, the total is out of 80 and must be described that way.
+late — and if Craft was never scored, the total is scaled up from the deterministic points that could be scored (80 with a content brief, 70 without) and must be described that way.
 
 ## 2b · Optional: compare against a library you consider best-in-class
 
@@ -94,8 +94,9 @@ which is why this happens at the start rather than at the end.
 
 ## 5 · Hand over the bundle
 
-`dist/` is the deliverable, whole: the `.dc.html`, both runtime files, `canvas.html`, the slot
-sidecar, and any fonts or logos. Nothing in it reaches outside itself. Zip that directory.
+`dist/` is the deliverable, whole: the `.dc.html`, both runtime files, `vendor/` (React), `canvas.html`,
+the slot sidecar, and any fonts or logos. It renders offline; the only optional outside request is the
+webfont stylesheet. Zip that directory.
 
 Tell the recipient it needs a server, and give them the one line that starts it:
 

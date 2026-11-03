@@ -13,7 +13,7 @@ emphasis carrier and chrome variant produces a visibly different card.
 | enumerator | `none · number · pip · rule · chip · icon · glyph` |
 | emphasis | `display · figure · media · quote · panel · diagram` |
 | media | `none · inset · sidecar · full-bleed · repeated` |
-| chrome | `paper · panel · ink · accent-1 · accent-2 · grey · flush` |
+| chrome | `paper · panel · ink · accent-1 · accent-2 · grey · flush` (`flush` = full-bleed media; not one of the five grounds) |
 
 ### On the `chrome` axis
 
@@ -47,7 +47,7 @@ sequence — a standalone question card is a dead end.
 most libraries and the best way to open an educational sequence.
 
 **05 · Quote monolith.** Pull quote at heading scale with attribution pinned to the bottom rule.
-Almost always `plate`. Never add quotation-mark graphics — the scale already signals it.
+Almost always `ink` or `grey`. Never add quotation-mark graphics — the scale already signals it.
 
 ## Stack — ruled rows, the workhorse
 
@@ -133,7 +133,7 @@ sizes. For conversion, filtering, qualification.
 **29 · Category strip.** Columns divided by vertical rules, each a category with its items listed
 beneath. Denser than a triad because items stack.
 
-**30 · Contrast strip.** Two or three columns where one is visually promoted (tinted, or on plate).
+**30 · Contrast strip.** Two or three columns where one is visually promoted (on `panel`, or on `ink`).
 For "these three approaches, and the one we take."
 
 ## Overlay — media as the ground
@@ -182,7 +182,8 @@ tuple table for collisions, then rebalance against the target distribution.
 When two cards collide, the cheapest resolution in order of preference:
 
 1. change the **enumerator** (number → pip → icon → chip) — costs nothing, reads as different
-2. change the **chrome** (standard → plate → tinted) — free punctuation
+2. change the **chrome** (paper → panel → ink → accent-1 → grey) — free punctuation, as long as
+   the same loud ground never lands on two adjacent cards
 3. change the **emphasis carrier** (display → figure → media)
 4. change the **partition** — the expensive one; do it only when the content actually wants it
 

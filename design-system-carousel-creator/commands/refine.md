@@ -1,6 +1,6 @@
 ---
 description: Iteratively fix audit defects by cause until the quality gate passes.
-argument-hint: <library.html> [--max-passes 4]
+argument-hint: "<library.html> [--max-passes 4]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Skill
 ---
 

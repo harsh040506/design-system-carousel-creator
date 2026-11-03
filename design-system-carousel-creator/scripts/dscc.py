@@ -100,8 +100,10 @@ def cmd_doctor(args) -> int:
             print(f"\ndesign system     {p.name} is JSON but not an object")
             return 1
         flat: dict[str, str] = {}
+        themes = sysd.get("themes") if isinstance(sysd.get("themes"), dict) else {}
         for theme in ("light", "dark"):
-            flat.update({k: v for k, v in (sysd.get("themes", {}).get(theme) or {}).items()})
+            tmap = themes.get(theme)
+            flat.update(tmap if isinstance(tmap, dict) else {})
         # `typography` is what the JSON Schema and scaffold.py read; doctor used to
         # flatten only `typography_tokens`, so a system declaring the font family
         # tokens correctly was reported as missing all three. The workaround was to
@@ -225,11 +227,11 @@ def wire_from_project(args) -> tuple[pathlib.Path | None, dict]:
     fill("brief", "brief")
     fill("plan", "plan")
     fill("critic", "critic")
-    if not getattr(args, "out", None) or args.out == "audit-out":
+    if not getattr(args, "out", None):
         args.out = str(pd / man["layout"]["audit"])
     if not getattr(args, "shots", None):
         args.shots = str(pd / man["layout"]["shots"])
-    if getattr(args, "rhythm", None) in (None, 64):
+    if getattr(args, "rhythm", None) is None:
         args.rhythm = (man.get("canvas") or {}).get("rhythm", 64)
     return pd, man
 
@@ -248,6 +250,8 @@ def _print_card_table(sc: dict, limit: int) -> None:
 
 def cmd_audit(args) -> int:
     pd, man = wire_from_project(args)
+    args.out = args.out or "audit-out"
+    args.rhythm = args.rhythm or 64
     if not args.library:
         print("no library to audit — pass one, or run inside a project that has built one")
         return 2
@@ -276,7 +280,8 @@ def cmd_audit(args) -> int:
     if pd:
         proj.append_history(pd, sc, note=getattr(args, "note", "") or "")
 
-    print(f"\nSCORE  {sc['total']}/100   gate: {sc['gate']}")
+    scaled = " (scaled)" if sc["unscored"] else ""
+    print(f"\nSCORE  {sc['total']}/100{scaled}   gate: {sc['gate']}")
     for r in sc["gate_reasons"]:
         print(f"   x {r}")
     print("")
@@ -285,8 +290,8 @@ def cmd_audit(args) -> int:
         bar = "" if v is None else "#" * int(round(v / w * 24))
         print(f"  {k:<12} {'  --' if v is None else format(v, '5.1f')} /{w:>3}  {bar}")
     if sc["unscored"]:
-        print(f"\n  unscored: {', '.join(sc['unscored'])} "
-              f"(scored out of {sc['scored_out_of']})")
+        print(f"\n  unscored: {', '.join(sc['unscored'])} — {sc.get('raw_points')} of "
+              f"{sc['scored_out_of']} scoreable points, scaled to 100 for the gate")
     if sc["degraded"]:
         print("  ! degraded mode: no manifest, artboard auto-detected, "
               "slack licensing unreadable")
@@ -315,9 +320,10 @@ def cmd_audit(args) -> int:
 def cmd_bench(args) -> int:
     """Same auditor, candidate and references, one table. Caveats printed."""
     targets = [("candidate", pathlib.Path(args.candidate))]
-    for r in args.references:
+    for n, r in enumerate(args.references, 1):
         p = pathlib.Path(r)
-        targets.append((p.stem[:22], p))
+        # numbered: two references with the same long stem used to share an out dir
+        targets.append((f"{n:02d}-{p.stem[:19]}", p))
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -419,15 +425,19 @@ def cmd_build(args) -> int:
 def cmd_preview(args) -> int:
     import serve as serve_mod
     directory, pd, paths, builder = serve_mod.resolve_target(args)
-    port = args.port
-    if port is None and pd:
+    cfg: dict = {}
+    if pd:
         try:
-            port = (proj.load(pd).get("serve") or {}).get("port", 4173)
+            cfg = proj.load(pd).get("serve") or {}
         except Exception:
-            port = 4173
+            cfg = {}
+    # Flags win; otherwise the manifest's serve.{port,open,watch} apply.
+    port = args.port if args.port is not None else cfg.get("port", 4173)
     return serve_mod.serve(directory, port=port or 4173,
-                           open_browser=not args.no_open, page=args.page,
-                           watch=args.watch, project_dir=pd, watch_paths=paths,
+                           open_browser=not args.no_open and cfg.get("open", True) is not False,
+                           page=args.page,
+                           watch=args.watch or bool(cfg.get("watch", False)),
+                           project_dir=pd, watch_paths=paths,
                            builder=builder, quiet=args.quiet)
 
 
@@ -446,6 +456,7 @@ def _delegate(mod_name: str, argv: list[str]) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(prog="dscc", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"dscc {score_mod.plugin_version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     # project management delegates to project.py so there is exactly one
@@ -501,12 +512,14 @@ def main() -> None:
     a.add_argument("--note", default=None, help="recorded in audit/history.jsonl")
     a.add_argument("--strict", action="store_true",
                    help="promote every accepted-but-unresolved P2 into a failure")
-    a.add_argument("--out", default="audit-out")
+    a.add_argument("--out", default=None,
+                   help="default: the project's audit/ folder, else audit-out/")
     a.add_argument("--selector", default=".frame")
     a.add_argument("--auto", action="store_true",
                    help="auto-detect artboards instead of using --selector "
                         "(degraded mode: for libraries not built by this plugin)")
-    a.add_argument("--rhythm", type=int, default=64)
+    a.add_argument("--rhythm", type=int, default=None,
+                   help="default: the project's canvas.rhythm, else 64")
     a.add_argument("--system", default=None)
     a.add_argument("--critic", default=None)
     a.add_argument("--brief", default=None)

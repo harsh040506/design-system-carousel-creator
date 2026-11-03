@@ -27,7 +27,8 @@ Six dimensions, 100 points. **Eighty are deterministic** — computed by `script
 on every run, diffable across versions, arguable with evidence. **Twenty are judged** by the
 `design-critic` agent from rendered PNGs against an anchored rubric.
 
-Of the eighty, seventy are *portable*: computable on any library, with or without this plugin's metadata.
+Of the eighty, seventy are *portable*: Integrity, Discipline, Density and Distinction, computable on any
+library with or without this plugin's metadata. (Veracity needs a content brief; Craft needs the critic.)
 That subset is what makes benchmarking against foreign libraries possible at all.
 
 | Dimension | Pts | Method |
@@ -51,10 +52,12 @@ is sound. With it, a pass says something specific about the thing the user actua
 
 ### An unscored dimension must be said out loud
 
-If `critic.json` is absent, Craft's 20 points are not scored, the total is out of 80, and the
-scorecard carries a `NO_CRITIC` defect that says so in those words. **Repeat it in the report.**
+If `critic.json` is absent, Craft's 20 points are not scored. The total is the points earned divided
+by the points that *could* be scored, scaled to 100 so the same gate thresholds stay meaningful. The
+scorecard carries `raw_points`, `scored_out_of` and an `unscored` list, plus a `NO_CRITIC` defect that
+states this plainly. **Repeat it in the report.**
 
-Presenting an 80-point total as though it were a 100-point one is the same dishonesty the benchmark
+Presenting a scaled total as though it were a full 100-point one is the same dishonesty the benchmark
 caveats exist to prevent, and it is easier to commit because nothing about the number 99.6 looks
 incomplete.
 
@@ -106,11 +109,14 @@ bounds checks — bleeding decoration is intent.
 | Zero raw px in card markup | 4 | `RAW_PX` |
 | Zero raw hex in card markup | 3 | `RAW_HEX` |
 | Zero inline `font-size` | 3 | `INLINE_TYPE` |
-| Computed sizes on the locked ramps | 3 | `OFF_SCALE` |
-| Gaps/margins on the spacing scale | 2 | `OFF_SCALE_SPACE` |
+| ≤11 distinct computed font sizes (zero at 22) | 3 | — |
+| ≤8 distinct computed gaps (zero at 20) | 2 | — |
+| Colour tokens present in both theme maps | −1.5 each, max −3 | `MONO_THEME_TOKEN` |
 
-`OFF_SCALE` is the one that catches slow drift — it reads *computed* values from the browser, so it
-finds sizes introduced through a class the linter never saw.
+The two spread checks are the ones that catch slow drift — they read *computed* values from the
+browser, so they find sizes introduced through a class the linter never saw. The linter's
+stylesheet pass names the individual offending values as `OFF_SCALE` (P2), so the drift can be
+located rather than only counted.
 
 ### Density — 20
 
@@ -118,9 +124,9 @@ finds sizes introduced through a class the linter never saw.
 |---|---|---|
 | Ink coverage ≥40% | 7 | `SPARSE` |
 | Max row gap ≤1.5× rhythm | 6 | `UNDERWRITTEN` |
-| Bottom slack licensed | 4 | `UNLICENSED_SLACK` / `FALSE_LICENSE` |
+| Bottom slack licensed (>520px also needs critic sign-off) | 4 | `UNLICENSED_SLACK` / `FALSE_LICENSE` / `SLACK_REVIEW` |
 | Library gap CV ≤0.35 | 2 | `GAP_VARIANCE` |
-| Coverage ≤78% | 1 | `OVERPACKED` |
+| Text-only coverage ≤88% | 1 | `OVERPACKED` |
 
 See `carousel-craft/references/density-law.md` for the full treatment. The critical property: these
 defects name a **cause**, not a symptom, because the name determines which fix gets reached for.
@@ -135,7 +141,9 @@ refiner is told so explicitly.
 | Mean pairwise distance ≥2.6 | 4 | `LOW_VARIETY` |
 | ≥8 of 10 partitions used | 2 | `NARROW_RANGE` |
 | No partition on >9 cards | 2 | `OVERUSED` |
-| Media/plate/tinted mix on target | 1 | `MIX_OFF` |
+| Media/figure/ground mix on target | 1 | `MIX_OFF` |
+| Fewer than 5 named surface grounds | −5 | `FLAT_SURFACES` (P1) |
+| Same loud ground (ink, accent-1, accent-2) on adjacent cards | −1 each, max −2 | `GROUND_CLUSTER` |
 
 Uniqueness is defined as tuple equality, so it is exact rather than impressionistic. Mean distance
 catches the subtler failure: a set where every pair differs on exactly one axis is technically
@@ -145,13 +153,15 @@ collision-free and still monotonous.
 
 | Check | Points | Defect |
 |---|---|---|
-| Every text node traces to a claim | 5 | `UNSOURCED` |
+| Every card carries `data-claim` ids, all present in the brief | 5 | `UNSOURCED` |
 | Every number appears in the brief | 4 | `INVENTED_FIGURE` |
 | No claim used more than twice | 1 | `CLAIM_REUSE` |
 
-Requires a `content-brief.json`. Libraries without one score `null` on this dimension and are graded
-out of 90 — which is also why benchmark comparisons against foreign libraries are made on the 60
-shared deterministic points.
+Requires a `content-brief.json`. Libraries without one score `null` on this dimension and the total
+is scaled over the points that could be scored — which is also why benchmark comparisons against
+foreign libraries are made on the 70 shared deterministic points (Integrity, Discipline, Density,
+Distinction). A claim's `figure` field counts as brief text, and "no claim used more than twice" is
+checked per claim.
 
 `INVENTED_FIGURE` is the highest-consequence defect in the whole system. A beautiful slide
 containing a number nobody can source is worse than an ugly one.
@@ -207,7 +217,7 @@ candidate, and prints one table.
 
 Two caveats, always printed with the results because a benchmark that hides them is worthless:
 
-1. **Veracity is unscoreable for foreign libraries** — no brief, so the comparison is made on the 60
+1. **Veracity is unscoreable for foreign libraries** — no brief, so the comparison is made on the 70
    deterministic points all libraries share.
 2. **Foreign libraries are audited in degraded mode** — no manifest, so the artboard is auto-detected
    and intent licensing can't be read. Unlicensed slack is scored *in their favour*. The candidate is
@@ -233,7 +243,7 @@ between measuring quality and manufacturing a favourable number.
       "detail":"max row gap 112px > 96px ceiling",
       "legal_fix":"add a row from the claim inventory" }
   ],
-  "library": { "gap_cv": 0.28, "mean_tuple_distance": 3.1, "coverage_mean": 0.52 }
+  "library": { "gap_cv": 0.28, "coverage_mean": 0.52 }   // tuple distance: uniq.json mean_distance
 }
 ```
 

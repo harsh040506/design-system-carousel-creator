@@ -48,7 +48,9 @@ every word does. Losing the supporting rows is fine and expected. Losing the hea
 
 ## Output
 
-Write `critic.json`:
+Write `critic.json` to the project's `audit/` folder (`artifacts.critic` in `project.json`,
+default `audit/critic.json`) — that is where `dscc audit` picks it up. Every row needs an integer
+`index`; a row without one cannot be attributed to a card and is ignored.
 
 ```json
 {"cards":[{"index":1,
@@ -61,6 +63,16 @@ Write `critic.json`:
 ```
 
 Omit `reason` only when the score is 5.
+
+### Slack sign-off
+
+If `audit/scorecard.json` lists a card as `SLACK_REVIEW` (more than 520px of licensed bottom slack), look at it
+and decide whether the quiet is intentional. When it is, add its index to a top-level
+`slack_signoff` array; when it is not, leave it out and say why in `note`.
+
+```json
+{"cards":[ ... ], "slack_signoff":[1, 50]}
+```
 
 Finish with a short prose summary: the three strongest cards and why, the three weakest and why, and
 any pattern you noticed across the set that a per-card score cannot express — that last one is

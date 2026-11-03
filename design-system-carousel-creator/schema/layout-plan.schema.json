@@ -37,7 +37,7 @@
           "chrome": {
             "type": "string",
             "enum": ["paper", "panel", "ink", "accent-1", "accent-2", "grey", "flush"],
-            "description": "The surface GROUND: a full colour treatment (ground plus every text role recoloured), not a background swap. A library must use at least 5 named grounds -- a light/dark pair is the most common failure in generated work. Loud grounds (ink, accent-1, accent-2) must never sit on adjacent cards."
+            "description": "The surface GROUND: a full colour treatment (ground plus every text role recoloured), not a background swap. A library must use at least 5 named grounds -- a light/dark pair is the most common failure in generated work. The same loud ground (ink, accent-1, accent-2) must never sit on two adjacent cards. `flush` is a full-bleed media card, not a ground, and does not count toward the five."
           },
 
           "claims": {

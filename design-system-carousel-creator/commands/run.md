@@ -1,6 +1,6 @@
 ---
 description: Run the whole pipeline — design system + sources in, scored template library out.
-argument-hint: <design-system.md> <source-doc...> [--cards 50] [--out DIR]
+argument-hint: "<design-system.md> <source-doc...> [--cards 50] [--out DIR]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill, Agent
 ---
 
@@ -54,10 +54,10 @@ Then work from inside the project directory. Every command below finds `project.
 
 ## 1 · Distill
 
-Load `design-system-distillation`. Read the brand input. Produce `design-system.json` and validate:
+Load `design-system-distillation`. Read the brand input. Produce `build/design-system.json` and validate:
 
 ```
-python ${CLAUDE_PLUGIN_ROOT}/scripts/dscc.py doctor --system design-system.json
+python ${CLAUDE_PLUGIN_ROOT}/scripts/dscc.py doctor --system build/design-system.json
 ```
 
 Report the coverage figure to the user — what proportion came from their source versus derivation.
@@ -66,7 +66,7 @@ They deserve to know how much of the result is their brand.
 ## 2 · Brief
 
 Read every source document **in full**. Extract atomic claims with provenance into
-`content-brief.json`. Over-extract: aim for 3× the card count. The surplus is what resolves
+`build/content-brief.json`. Over-extract: aim for 3× the card count. The surplus is what resolves
 under-written cards later without inventing anything.
 
 If the sources are long, dispatch `content-strategist` — but only if the user asked for subagents or
@@ -74,11 +74,11 @@ the volume genuinely warrants it. Otherwise read them yourself.
 
 ## 3 · Plan
 
-Produce `layout-plan.json`: one mechanic tuple per card, claims assigned, intent declared. Check it
+Produce `build/layout-plan.json`: one mechanic tuple per card, claims assigned, intent declared. Check it
 before building anything:
 
 ```
-python ${CLAUDE_PLUGIN_ROOT}/scripts/uniq.py layout-plan.json --out uniq.json
+python ${CLAUDE_PLUGIN_ROOT}/scripts/uniq.py build/layout-plan.json --out uniq.json
 ```
 
 Resolve every `DUP_LAYOUT` and `MIX_OFF` **in the plan**. Fixing distinction after the cards exist

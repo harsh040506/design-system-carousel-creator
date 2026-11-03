@@ -15,8 +15,8 @@
     "canvas": {
       "type": "object", "required": ["width", "height"],
       "properties": {
-        "width": { "type": "integer", "const": 1080 },
-        "height": { "type": "integer", "enum": [1350, 1440, 1080] },
+        "width": { "type": "integer", "minimum": 640, "maximum": 2160, "default": 1080 },
+        "height": { "type": "integer", "minimum": 640, "maximum": 3000, "default": 1440, "description": "1440 (3:4) is the default; 1350 (4:5) for Instagram portrait, 1080 for square." },
         "ratio": { "type": "string" },
         "rhythm": { "type": "integer", "default": 64, "description": "Reference unit for the density auditor's gap ceiling" }
       }
